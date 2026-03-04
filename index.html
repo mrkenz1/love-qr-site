@@ -1,0 +1,154 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Special Message</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Manrope:wght@400;500;700&family=Playfair+Display:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <div class="ambient-bg" aria-hidden="true"></div>
+
+  <header class="hero" data-reveal>
+    <p class="hero-kicker">A SPECIAL MESSAGE FOR</p>
+    <h1 id="recipientHeading">My Love</h1>
+    <p class="hero-subtext">Every love story is beautiful, but ours is my favorite.</p>
+    <div class="hero-actions">
+      <button id="openLetterBtn" class="btn btn-primary" type="button">Open Your Love Letter</button>
+      <a class="btn btn-link" href="#share">Create Shareable QR</a>
+    </div>
+  </header>
+
+  <main>
+    <section id="letter" class="section card" data-reveal>
+      <div class="section-head">
+        <h2>My Love Letter</h2>
+        <p class="section-note">For <span id="recipientInline">you</span></p>
+      </div>
+
+      <article class="letter-body">
+        <p>From the moment I met you, my world changed in the most beautiful way.</p>
+        <p>Every day with you feels like a gift. Your smile lights up my hardest days.</p>
+        <p>I love the way you laugh, the way you care, and the way you make ordinary moments feel magical.</p>
+        <p id="customNote" class="custom-note" hidden></p>
+        <p>You are my best friend, my safe place, and my forever.</p>
+        <p class="signature">Forever yours, <span id="fromSignature">Your Forever</span></p>
+      </article>
+    </section>
+
+    <section id="memories" class="section" data-reveal>
+      <div class="section-head">
+        <h2>Our Memories</h2>
+        <p class="section-note">Tap a card to open</p>
+      </div>
+
+      <div class="memory-grid">
+        <button class="memory-card" type="button" data-title="First Coffee" data-caption="The day our long conversation started." data-image="https://picsum.photos/seed/love1/900/600">
+          <img src="https://picsum.photos/seed/love1/420/300" alt="Memory one">
+          <span>First Coffee</span>
+        </button>
+        <button class="memory-card" type="button" data-title="City Lights" data-caption="That late night walk and endless laughter." data-image="https://picsum.photos/seed/love2/900/600">
+          <img src="https://picsum.photos/seed/love2/420/300" alt="Memory two">
+          <span>City Lights</span>
+        </button>
+        <button class="memory-card" type="button" data-title="Sunset Promise" data-caption="We watched the sky turn gold together." data-image="https://picsum.photos/seed/love3/900/600">
+          <img src="https://picsum.photos/seed/love3/420/300" alt="Memory three">
+          <span>Sunset Promise</span>
+        </button>
+        <button class="memory-card" type="button" data-title="Rainy Day" data-caption="We stayed in, talked for hours, and forgot time." data-image="https://picsum.photos/seed/love4/900/600">
+          <img src="https://picsum.photos/seed/love4/420/300" alt="Memory four">
+          <span>Rainy Day</span>
+        </button>
+        <button class="memory-card" type="button" data-title="Weekend Trip" data-caption="A short trip that became one of my favorite memories." data-image="https://picsum.photos/seed/love5/900/600">
+          <img src="https://picsum.photos/seed/love5/420/300" alt="Memory five">
+          <span>Weekend Trip</span>
+        </button>
+        <button class="memory-card" type="button" data-title="Simple Moments" data-caption="You + me + peace. That is enough." data-image="https://picsum.photos/seed/love6/900/600">
+          <img src="https://picsum.photos/seed/love6/420/300" alt="Memory six">
+          <span>Simple Moments</span>
+        </button>
+      </div>
+    </section>
+
+    <section id="playlist" class="section card" data-reveal>
+      <div class="section-head">
+        <h2>Our Playlist</h2>
+        <p class="section-note">Songs that remind me of us</p>
+      </div>
+
+      <div class="playlist-wrap">
+        <div class="player-box">
+          <p class="player-title" id="nowPlaying">Timeless Love Song</p>
+          <p class="player-artist" id="nowArtist">Your Playlist</p>
+          <div class="player-controls">
+            <button id="playPauseBtn" class="btn btn-primary" type="button">Play</button>
+            <div class="progress-track">
+              <div id="progressBar" class="progress-bar"></div>
+            </div>
+          </div>
+        </div>
+
+        <ul class="song-list" id="songList">
+          <li class="song-item active" data-song="Timeless Love Song" data-artist="Your Playlist">Timeless Love Song</li>
+          <li class="song-item" data-song="You and Me" data-artist="Your Playlist">You and Me</li>
+          <li class="song-item" data-song="Always in My Heart" data-artist="Your Playlist">Always in My Heart</li>
+          <li class="song-item" data-song="Forever Starts Tonight" data-artist="Your Playlist">Forever Starts Tonight</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="share" class="section card" data-reveal>
+      <div class="section-head">
+        <h2>Send This With QR</h2>
+        <p class="section-note">Create a personal link, then send the QR image.</p>
+      </div>
+
+      <form id="shareForm" class="share-form">
+        <label for="toInput">To</label>
+        <input id="toInput" name="to" type="text" maxlength="40" placeholder="Her/His name">
+
+        <label for="fromInput">From</label>
+        <input id="fromInput" name="from" type="text" maxlength="40" placeholder="Your name">
+
+        <label for="noteInput">Short note</label>
+        <textarea id="noteInput" name="note" rows="3" maxlength="180" placeholder="A short custom message"></textarea>
+
+        <button class="btn btn-primary" type="submit">Generate Link + QR</button>
+      </form>
+
+      <div class="qr-panel">
+        <canvas id="qrCanvas" width="220" height="220" aria-label="QR code"></canvas>
+        <label for="shareUrl">Share URL</label>
+        <input id="shareUrl" type="text" readonly>
+
+        <div class="qr-actions">
+          <button id="copyBtn" class="btn btn-secondary" type="button">Copy Link</button>
+          <button id="downloadQrBtn" class="btn btn-secondary" type="button">Download QR</button>
+          <button id="nativeShareBtn" class="btn btn-secondary" type="button">Share</button>
+        </div>
+
+        <p id="shareStatus" class="share-status" aria-live="polite"></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    <p>Made with love. Best viewed on mobile and desktop.</p>
+  </footer>
+
+  <div id="memoryModal" class="modal" hidden>
+    <div class="modal-overlay" data-close-modal></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-label="Memory preview">
+      <button id="closeModalBtn" class="modal-close" type="button" aria-label="Close">X</button>
+      <img id="modalImage" src="" alt="Selected memory">
+      <h3 id="modalTitle"></h3>
+      <p id="modalCaption"></p>
+    </div>
+  </div>
+</body>
+</html>
