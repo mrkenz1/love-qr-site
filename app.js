@@ -47,6 +47,15 @@
     note: ""
   };
 
+  const MEMORY_SLOT_IMAGES = [
+    "./assets/zurag1.jpg",
+    "./assets/zurag2.jpg",
+    "./assets/zurag3.jpg",
+    "./assets/zurag4.jpg",
+    "./assets/zurag5.jpg",
+    "./assets/zurag6.jpg"
+  ];
+
   function safeText(value, fallback) {
     const v = (value || "").trim();
     return v.length ? v : fallback;
@@ -175,6 +184,19 @@
         imgElement.dataset.imageRetryTried = tried.join("||");
         imgElement.src = next;
         return;
+      }
+
+      const card = imgElement.closest(".memory-card");
+      if (card) {
+        const idx = getMemoryCards().indexOf(card);
+        const slotCandidate = normalizeImagePath(MEMORY_SLOT_IMAGES[idx], "");
+        if (slotCandidate && slotCandidate !== current && !tried.includes(slotCandidate)) {
+          tried.push(slotCandidate);
+          imgElement.dataset.imageRetryTried = tried.join("||");
+          card.setAttribute("data-image", slotCandidate);
+          imgElement.src = slotCandidate;
+          return;
+        }
       }
 
       imgElement.src = memoryFallbackImage;
