@@ -380,6 +380,10 @@ textarea:focus {
   z-index: 30;
 }
 
+.modal[hidden] {
+  display: none;
+}
+
 .modal-overlay {
   position: absolute;
   inset: 0;
