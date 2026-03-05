@@ -116,6 +116,261 @@
     return new TextDecoder().decode(bytes);
   }
 
+  const LZ_URI_SAFE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$";
+
+  function lzGetBaseValue(alphabet, character) {
+    const idx = alphabet.indexOf(character);
+    return idx < 0 ? 0 : idx;
+  }
+
+  function lzCompressToEncodedURIComponent(input) {
+    if (input == null) {
+      return "";
+    }
+    return lzCompress(input, 6, (value) => LZ_URI_SAFE_ALPHABET.charAt(value));
+  }
+
+  function lzDecompressFromEncodedURIComponent(input) {
+    if (input == null) {
+      return "";
+    }
+    if (input === "") {
+      return null;
+    }
+    const safeInput = input.replace(/ /g, "+");
+    return lzDecompress(safeInput.length, 32, (index) => lzGetBaseValue(LZ_URI_SAFE_ALPHABET, safeInput.charAt(index)));
+  }
+
+  function lzCompress(uncompressed, bitsPerChar, getCharFromInt) {
+    if (uncompressed == null) {
+      return "";
+    }
+
+    const dictionary = Object.create(null);
+    const dictionaryToCreate = Object.create(null);
+    let c = "";
+    let wc = "";
+    let w = "";
+    let enlargeIn = 2;
+    let dictSize = 3;
+    let numBits = 2;
+    const data = [];
+    let dataVal = 0;
+    let dataPosition = 0;
+
+    const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+
+    const writeBit = (bit) => {
+      dataVal = (dataVal << 1) | bit;
+      if (dataPosition === bitsPerChar - 1) {
+        dataPosition = 0;
+        data.push(getCharFromInt(dataVal));
+        dataVal = 0;
+      } else {
+        dataPosition += 1;
+      }
+    };
+
+    const writeBits = (value, bitCount) => {
+      let remaining = bitCount;
+      let val = value;
+      while (remaining > 0) {
+        writeBit(val & 1);
+        val >>= 1;
+        remaining -= 1;
+      }
+    };
+
+    for (let ii = 0; ii < uncompressed.length; ii += 1) {
+      c = uncompressed.charAt(ii);
+      if (!hasOwn(dictionary, c)) {
+        dictionary[c] = dictSize;
+        dictSize += 1;
+        dictionaryToCreate[c] = true;
+      }
+
+      wc = w + c;
+      if (hasOwn(dictionary, wc)) {
+        w = wc;
+      } else {
+        if (hasOwn(dictionaryToCreate, w)) {
+          if (w.charCodeAt(0) < 256) {
+            writeBits(0, numBits);
+            writeBits(w.charCodeAt(0), 8);
+          } else {
+            writeBits(1, numBits);
+            writeBits(w.charCodeAt(0), 16);
+          }
+
+          enlargeIn -= 1;
+          if (enlargeIn === 0) {
+            enlargeIn = Math.pow(2, numBits);
+            numBits += 1;
+          }
+          delete dictionaryToCreate[w];
+        } else {
+          writeBits(dictionary[w], numBits);
+        }
+
+        enlargeIn -= 1;
+        if (enlargeIn === 0) {
+          enlargeIn = Math.pow(2, numBits);
+          numBits += 1;
+        }
+
+        dictionary[wc] = dictSize;
+        dictSize += 1;
+        w = String(c);
+      }
+    }
+
+    if (w !== "") {
+      if (hasOwn(dictionaryToCreate, w)) {
+        if (w.charCodeAt(0) < 256) {
+          writeBits(0, numBits);
+          writeBits(w.charCodeAt(0), 8);
+        } else {
+          writeBits(1, numBits);
+          writeBits(w.charCodeAt(0), 16);
+        }
+
+        enlargeIn -= 1;
+        if (enlargeIn === 0) {
+          enlargeIn = Math.pow(2, numBits);
+          numBits += 1;
+        }
+        delete dictionaryToCreate[w];
+      } else {
+        writeBits(dictionary[w], numBits);
+      }
+
+      enlargeIn -= 1;
+      if (enlargeIn === 0) {
+        enlargeIn = Math.pow(2, numBits);
+        numBits += 1;
+      }
+    }
+
+    writeBits(2, numBits);
+
+    while (true) {
+      dataVal <<= 1;
+      if (dataPosition === bitsPerChar - 1) {
+        data.push(getCharFromInt(dataVal));
+        break;
+      } else {
+        dataPosition += 1;
+      }
+    }
+
+    return data.join("");
+  }
+
+  function lzDecompress(length, resetValue, getNextValue) {
+    const dictionary = [];
+    let next;
+    let enlargeIn = 4;
+    let dictSize = 4;
+    let numBits = 3;
+    let entry = "";
+    const result = [];
+    let w;
+    let bits;
+    let c;
+    const data = {
+      val: getNextValue(0),
+      position: resetValue,
+      index: 1
+    };
+
+    for (let i = 0; i < 3; i += 1) {
+      dictionary[i] = i;
+    }
+
+    const readBits = (bitCount) => {
+      let bitsValue = 0;
+      let maxpower = Math.pow(2, bitCount);
+      let power = 1;
+      while (power !== maxpower) {
+        const resb = data.val & data.position;
+        data.position >>= 1;
+        if (data.position === 0) {
+          data.position = resetValue;
+          data.val = getNextValue(data.index);
+          data.index += 1;
+        }
+        bitsValue |= (resb > 0 ? 1 : 0) * power;
+        power <<= 1;
+      }
+      return bitsValue;
+    };
+
+    next = readBits(2);
+    switch (next) {
+      case 0:
+        c = String.fromCharCode(readBits(8));
+        break;
+      case 1:
+        c = String.fromCharCode(readBits(16));
+        break;
+      case 2:
+        return "";
+      default:
+        c = "";
+        break;
+    }
+
+    dictionary[3] = c;
+    w = c;
+    result.push(c);
+
+    while (true) {
+      if (data.index > length) {
+        return "";
+      }
+
+      bits = readBits(numBits);
+
+      if (bits === 0) {
+        dictionary[dictSize] = String.fromCharCode(readBits(8));
+        bits = dictSize;
+        dictSize += 1;
+        enlargeIn -= 1;
+      } else if (bits === 1) {
+        dictionary[dictSize] = String.fromCharCode(readBits(16));
+        bits = dictSize;
+        dictSize += 1;
+        enlargeIn -= 1;
+      } else if (bits === 2) {
+        return result.join("");
+      }
+
+      if (enlargeIn === 0) {
+        enlargeIn = Math.pow(2, numBits);
+        numBits += 1;
+      }
+
+      if (dictionary[bits]) {
+        entry = dictionary[bits];
+      } else if (bits === dictSize) {
+        entry = w + w.charAt(0);
+      } else {
+        return null;
+      }
+
+      result.push(entry);
+      dictionary[dictSize] = w + entry.charAt(0);
+      dictSize += 1;
+      enlargeIn -= 1;
+      w = entry;
+
+      if (enlargeIn === 0) {
+        enlargeIn = Math.pow(2, numBits);
+        numBits += 1;
+      }
+    }
+  }
+
   function packSong(song) {
     return [
       safeText(song?.name, ""),
@@ -212,7 +467,8 @@
 
   function encodeCfg(config) {
     try {
-      return utf8ToBase64Url(JSON.stringify(serializeCfg(config)));
+      const packed = serializeCfg(config);
+      return lzCompressToEncodedURIComponent(JSON.stringify(packed));
     } catch (_error) {
       return "";
     }
@@ -224,9 +480,19 @@
     }
 
     try {
-      const parsed = JSON.parse(base64UrlToUtf8(raw));
-      return deserializeCfg(parsed);
+      const lzText = lzDecompressFromEncodedURIComponent(raw);
+      if (lzText) {
+        const parsed = JSON.parse(lzText);
+        return deserializeCfg(parsed);
+      }
     } catch (_error) {
+      // fall through to legacy decode
+    }
+
+    try {
+      const legacyParsed = JSON.parse(base64UrlToUtf8(raw));
+      return deserializeCfg(legacyParsed);
+    } catch (_legacyError) {
       return null;
     }
   }
