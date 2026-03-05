@@ -52,6 +52,32 @@
     return v.length ? v : fallback;
   }
 
+  function normalizeImagePath(value, fallback = memoryFallbackImage) {
+    const raw = safeText(value, fallback).replace(/\\/g, "/");
+    if (!raw) {
+      return fallback;
+    }
+
+    if (/^(https?:\/\/|data:|blob:|\.{0,2}\/|\/)/i.test(raw)) {
+      return raw;
+    }
+
+    if (/^[a-z]:\//i.test(raw)) {
+      const filename = raw.split("/").filter(Boolean).pop() || "";
+      return filename ? `./assets/${filename}` : fallback;
+    }
+
+    if (raw.startsWith("assets/")) {
+      return `./${raw}`;
+    }
+
+    if (/\.[a-z0-9]{2,6}($|[?#])/i.test(raw)) {
+      return `./assets/${raw}`;
+    }
+
+    return raw;
+  }
+
   function getLetterBlocks() {
     return Array.from(document.querySelectorAll("[data-edit-letter]"));
   }
@@ -770,7 +796,7 @@
       memories: getMemoryCards().map((card) => ({
         title: safeText(card.getAttribute("data-title"), "Memory"),
         caption: safeText(card.getAttribute("data-caption"), ""),
-        image: safeText(card.getAttribute("data-image"), memoryFallbackImage)
+        image: normalizeImagePath(card.getAttribute("data-image"), memoryFallbackImage)
       }))
     };
   }
@@ -859,7 +885,7 @@
 
         const title = safeText(next.title, card.getAttribute("data-title") || "Memory");
         const caption = safeText(next.caption, card.getAttribute("data-caption") || "");
-        const image = safeText(next.image, card.getAttribute("data-image") || memoryFallbackImage);
+        const image = normalizeImagePath(next.image, card.getAttribute("data-image") || memoryFallbackImage);
 
         card.setAttribute("data-title", title);
         card.setAttribute("data-caption", caption);
@@ -896,7 +922,7 @@
       memories: getMemoryCards().map((card, index) => ({
         title: safeText(card.getAttribute("data-title"), defaultContent.memories[index]?.title || "Memory"),
         caption: safeText(card.getAttribute("data-caption"), defaultContent.memories[index]?.caption || ""),
-        image: safeText(card.getAttribute("data-image"), defaultContent.memories[index]?.image || memoryFallbackImage)
+        image: normalizeImagePath(card.getAttribute("data-image"), defaultContent.memories[index]?.image || memoryFallbackImage)
       }))
     };
   }
@@ -1399,14 +1425,14 @@
           return;
         }
 
-        const nextImage = window.prompt("Image URL / path", currentImage);
+        const nextImage = window.prompt("Image URL эсвэл file name (ж: zurag1.jpg)", currentImage);
         if (nextImage === null) {
           return;
         }
 
         const title = safeText(nextTitle, currentTitle);
         const caption = safeText(nextCaption, currentCaption);
-        const image = safeText(nextImage, currentImage);
+        const image = normalizeImagePath(nextImage, currentImage);
 
         card.setAttribute("data-title", title);
         card.setAttribute("data-caption", caption);
@@ -1423,6 +1449,9 @@
           cardImage.src = image;
         }
 
+        if (isAdminMode) {
+          showStatus(`Memory image updated: ${image}`);
+        }
         refreshAdminQr();
       });
 
