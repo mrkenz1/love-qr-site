@@ -12,6 +12,7 @@
   const modalTitle = document.getElementById("modalTitle");
   const modalCaption = document.getElementById("modalCaption");
   const closeModalBtn = document.getElementById("closeModalBtn");
+  const memoryFallbackImage = "./assets/memory-fallback.svg";
 
   const songList = document.getElementById("songList");
   const nowPlaying = document.getElementById("nowPlaying");
@@ -192,7 +193,21 @@
     }
   }
 
+  function ensureImageFallback(imgElement) {
+    imgElement.addEventListener(
+      "error",
+      () => {
+        if (imgElement.src.endsWith("memory-fallback.svg")) {
+          return;
+        }
+        imgElement.src = memoryFallbackImage;
+      },
+      { once: true }
+    );
+  }
+
   function openModal(image, title, caption) {
+    ensureImageFallback(modalImage);
     modalImage.src = image;
     modalTitle.textContent = title;
     modalCaption.textContent = caption;
@@ -269,6 +284,11 @@
   });
 
   document.querySelectorAll(".memory-card").forEach((card) => {
+    const cardImage = card.querySelector("img");
+    if (cardImage) {
+      ensureImageFallback(cardImage);
+    }
+
     card.addEventListener("click", () => {
       openModal(
         card.getAttribute("data-image") || "",
