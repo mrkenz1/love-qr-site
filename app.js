@@ -22,6 +22,10 @@
   const progressBar = document.getElementById("progressBar");
   const playerStatus = document.getElementById("playerStatus");
   const audioPlayer = document.getElementById("audioPlayer");
+  const soundcloudEmbed = document.getElementById("soundcloudEmbed");
+  const soundcloudUrlInput = document.getElementById("soundcloudUrlInput");
+  const applySoundcloudBtn = document.getElementById("applySoundcloudBtn");
+  const embedAdminControls = document.getElementById("embedAdminControls");
 
   const shareForm = document.getElementById("shareForm");
   const toInput = document.getElementById("toInput");
@@ -82,10 +86,16 @@
   }
 
   function readDefaultContent() {
+    const defaultSoundcloudSource = safeText(
+      soundcloudEmbed?.getAttribute("data-source"),
+      "https://soundcloud.com/chillhopdotcom/sets/lofi-beats"
+    );
+
     return {
       heroSubtext: safeText(heroSubtext?.textContent, "Every love story is beautiful, but ours is my favorite."),
       letters: getLetterBlocks().map((p) => safeText(p.textContent, "")),
       songs: getSongItems().map((item) => songEntryFromItem(item)),
+      soundcloudSource: defaultSoundcloudSource,
       memories: getMemoryCards().map((card) => ({
         title: safeText(card.getAttribute("data-title"), "Memory"),
         caption: safeText(card.getAttribute("data-caption"), ""),
@@ -193,6 +203,34 @@
     }
     playerStatus.textContent = message;
     playerStatus.style.color = isError ? "#9f103f" : "#8f1d4f";
+  }
+
+  function toSoundcloudEmbedUrl(rawUrl) {
+    const source = safeText(rawUrl, defaultContent.soundcloudSource);
+    if (!source) {
+      return "";
+    }
+
+    if (source.includes("w.soundcloud.com/player/")) {
+      return source;
+    }
+
+    const encoded = encodeURIComponent(source);
+    return `https://w.soundcloud.com/player/?url=${encoded}&color=%23e53a78&auto_play=false&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true`;
+  }
+
+  function setSoundcloudSource(source) {
+    const normalizedSource = safeText(source, defaultContent.soundcloudSource);
+    const embedUrl = toSoundcloudEmbedUrl(normalizedSource);
+
+    if (soundcloudEmbed) {
+      soundcloudEmbed.setAttribute("data-source", normalizedSource);
+      soundcloudEmbed.src = embedUrl;
+    }
+
+    if (soundcloudUrlInput) {
+      soundcloudUrlInput.value = normalizedSource;
+    }
   }
 
   function normalizeSongConfig(raw, fallback = {}) {
@@ -327,6 +365,10 @@
       });
     }
 
+    if (typeof cfg.soundcloudSource === "string") {
+      setSoundcloudSource(cfg.soundcloudSource);
+    }
+
     if (Array.isArray(cfg.memories)) {
       const cards = getMemoryCards();
       cards.forEach((card, index) => {
@@ -372,6 +414,10 @@
       compact.songs = cfg.songs;
     }
 
+    if (cfg.soundcloudSource !== defaultContent.soundcloudSource) {
+      compact.soundcloudSource = cfg.soundcloudSource;
+    }
+
     if (JSON.stringify(cfg.memories) !== JSON.stringify(defaultContent.memories)) {
       compact.memories = cfg.memories;
     }
@@ -384,6 +430,10 @@
       heroSubtext: safeText(heroSubtext?.textContent, defaultContent.heroSubtext),
       letters: getLetterBlocks().map((p, index) => safeText(p.textContent, defaultContent.letters[index] || "")),
       songs: getSongItems().map((item, index) => songEntryFromItem(item, defaultContent.songs[index])),
+      soundcloudSource: safeText(
+        soundcloudEmbed?.getAttribute("data-source"),
+        defaultContent.soundcloudSource
+      ),
       memories: getMemoryCards().map((card, index) => ({
         title: safeText(card.getAttribute("data-title"), defaultContent.memories[index]?.title || "Memory"),
         caption: safeText(card.getAttribute("data-caption"), defaultContent.memories[index]?.caption || ""),
@@ -812,6 +862,9 @@
     });
 
     addMemoryEditButtons();
+    if (embedAdminControls) {
+      embedAdminControls.hidden = false;
+    }
 
     [toInput, fromInput, noteInput].forEach((input) => {
       input.addEventListener("input", () => refreshAdminQr());
@@ -902,9 +955,33 @@
   downloadQrBtn.addEventListener("click", downloadQr);
   nativeShareBtn.addEventListener("click", nativeShare);
 
+  if (applySoundcloudBtn) {
+    applySoundcloudBtn.addEventListener("click", () => {
+      if (!isAdminMode) {
+        return;
+      }
+      setSoundcloudSource(soundcloudUrlInput?.value || "");
+      refreshAdminQr();
+      showStatus("SoundCloud embed updated.");
+    });
+  }
+
+  if (soundcloudUrlInput) {
+    soundcloudUrlInput.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || !isAdminMode) {
+        return;
+      }
+      event.preventDefault();
+      setSoundcloudSource(soundcloudUrlInput.value);
+      refreshAdminQr();
+      showStatus("SoundCloud embed updated.");
+    });
+  }
+
   const initialProfile = readParams();
   applyProfile(initialProfile);
   applyCfg(initialProfile.cfg);
+  setSoundcloudSource(soundcloudEmbed?.getAttribute("data-source") || defaultContent.soundcloudSource);
   setupSongUi();
 
   if (initialProfile.admin) {

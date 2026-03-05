@@ -113,6 +113,31 @@
       </div>
     </section>
 
+    <section id="playlistEmbed" class="section card" data-reveal>
+      <div class="section-head">
+        <h2>SoundCloud Playlist</h2>
+        <p class="section-note">Live embed player for your shared page</p>
+      </div>
+
+      <div class="embed-wrap">
+        <iframe
+          id="soundcloudEmbed"
+          title="SoundCloud Playlist"
+          data-source="https://soundcloud.com/chillhopdotcom/sets/lofi-beats"
+          src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/chillhopdotcom/sets/lofi-beats&color=%23e53a78&auto_play=false&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true"
+          loading="lazy"
+          allow="autoplay"
+          frameborder="no">
+        </iframe>
+      </div>
+
+      <div id="embedAdminControls" class="embed-admin" hidden>
+        <label for="soundcloudUrlInput">SoundCloud track/playlist URL</label>
+        <input id="soundcloudUrlInput" type="text" placeholder="https://soundcloud.com/.../sets/...">
+        <button id="applySoundcloudBtn" class="btn btn-secondary" type="button">Apply SoundCloud URL</button>
+      </div>
+    </section>
+
     <section id="share" class="section card" data-reveal>
       <div class="section-head">
         <h2>Send This With QR</h2>

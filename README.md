@@ -55,4 +55,7 @@ When the other person scans the QR, the same personalized page opens.
 5. In Playlist:
    - edit song names inline
    - click the `Audio` button on each song and set path like `./assets/music/song-1.mp3`
-6. The locked QR auto-refreshes after changes.
+6. In SoundCloud Playlist:
+   - paste a SoundCloud track/playlist URL
+   - click `Apply SoundCloud URL`
+7. The locked QR auto-refreshes after changes.
