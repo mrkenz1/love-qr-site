@@ -49,7 +49,7 @@
 
   const MEMORY_SLOT_IMAGES = [
     "./assets/zurag1.jpg",
-    "./assets/zurag2.jpg",
+    "./assets/zurag12.JPG",
     "./assets/zurag3.jpg",
     "./assets/zurag4.jpg",
     "./assets/zurag5.jpg",
