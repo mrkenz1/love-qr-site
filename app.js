@@ -115,11 +115,73 @@
       return;
     }
 
-    imgElement.addEventListener("error", () => {
-      if (imgElement.src.endsWith("memory-fallback.svg")) {
+    const pushUnique = (list, value, current) => {
+      if (!value || value === current || list.includes(value)) {
         return;
       }
+      list.push(value);
+    };
+
+    const buildImageRetryCandidates = (currentSrc) => {
+      const current = safeText(currentSrc, "").replace(/\\/g, "/");
+      if (!current || /^(data:|blob:)/i.test(current)) {
+        return [];
+      }
+
+      const splitIndex = current.search(/[?#]/);
+      const clean = splitIndex >= 0 ? current.slice(0, splitIndex) : current;
+      const suffix = splitIndex >= 0 ? current.slice(splitIndex) : "";
+      const match = clean.match(/^(.*?)(\.[^.\/]+)$/);
+      if (!match) {
+        return [];
+      }
+
+      const base = match[1];
+      const ext = match[2];
+      const extLower = ext.toLowerCase();
+      const extUpper = ext.toUpperCase();
+      const candidates = [];
+
+      pushUnique(candidates, `${base}${extLower}${suffix}`, current);
+      pushUnique(candidates, `${base}${extUpper}${suffix}`, current);
+
+      if (extLower === ".jpg" || extLower === ".jpeg") {
+        [".jpg", ".JPG", ".jpeg", ".JPEG", ".png", ".PNG"].forEach((variant) => {
+          pushUnique(candidates, `${base}${variant}${suffix}`, current);
+        });
+      } else if (extLower === ".png") {
+        [".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG"].forEach((variant) => {
+          pushUnique(candidates, `${base}${variant}${suffix}`, current);
+        });
+      }
+
+      return candidates;
+    };
+
+    imgElement.addEventListener("error", () => {
+      const current = safeText(imgElement.getAttribute("src"), "");
+      if (!current || current.includes("memory-fallback.svg")) {
+        return;
+      }
+
+      const tried = (imgElement.dataset.imageRetryTried || "")
+        .split("||")
+        .map((v) => v.trim())
+        .filter(Boolean);
+
+      const next = buildImageRetryCandidates(current).find((candidate) => !tried.includes(candidate));
+      if (next) {
+        tried.push(next);
+        imgElement.dataset.imageRetryTried = tried.join("||");
+        imgElement.src = next;
+        return;
+      }
+
       imgElement.src = memoryFallbackImage;
+    });
+
+    imgElement.addEventListener("load", () => {
+      imgElement.dataset.imageRetryTried = "";
     });
 
     imgElement.dataset.fallbackBound = "1";
