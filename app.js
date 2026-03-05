@@ -35,6 +35,7 @@
 
   let isPlaying = false;
   let progressTimer = null;
+  let isAdminMode = false;
 
   function safeText(value, fallback) {
     const v = (value || "").trim();
@@ -47,7 +48,8 @@
     const from = safeText(params.get("from"), "Your Forever");
     const note = safeText(params.get("note"), "");
     const lock = params.get("lock") === "1";
-    return { to, from, note, lock };
+    const admin = params.get("admin") === "1";
+    return { to, from, note, lock, admin };
   }
 
   function applyProfile(profile) {
@@ -68,7 +70,8 @@
     noteInput.value = profile.note;
   }
 
-  function buildPersonalUrl(to, from, note, lock = true) {
+  function buildPersonalUrl(to, from, note, options = {}) {
+    const { lock = true, admin = false } = options;
     const url = new URL(window.location.href);
     url.search = "";
     url.hash = "";
@@ -84,6 +87,9 @@
     }
     if (lock) {
       url.searchParams.set("lock", "1");
+    }
+    if (admin) {
+      url.searchParams.set("admin", "1");
     }
 
     return url.toString();
@@ -131,8 +137,8 @@
     const profile = { to, from, note };
     applyProfile(profile);
 
-    const lockedUrl = buildPersonalUrl(to, from, note, true);
-    const previewUrl = buildPersonalUrl(to, from, note, false);
+    const lockedUrl = buildPersonalUrl(to, from, note, { lock: true, admin: false });
+    const previewUrl = buildPersonalUrl(to, from, note, { lock: false, admin: isAdminMode });
     renderQr(lockedUrl);
     window.history.replaceState(null, "", previewUrl);
   }
@@ -211,6 +217,18 @@
       },
       { once: true }
     );
+  }
+
+  function setRecipientView(isLockedView, adminView) {
+    if (!isLockedView || adminView) {
+      return;
+    }
+    if (shareSection) {
+      shareSection.hidden = true;
+    }
+    if (shareNavLink) {
+      shareNavLink.hidden = true;
+    }
   }
 
   function openModal(image, title, caption) {
@@ -344,21 +362,14 @@
   nativeShareBtn.addEventListener("click", nativeShare);
 
   const initialProfile = readParams();
+  isAdminMode = initialProfile.admin;
+
   applyProfile(initialProfile);
-  setRecipientView(initialProfile.lock);
-  if (!initialProfile.lock) {
-    renderQr(buildPersonalUrl(initialProfile.to, initialProfile.from, initialProfile.note, true));
+  setRecipientView(initialProfile.lock, initialProfile.admin);
+
+  if (!initialProfile.lock || initialProfile.admin) {
+    renderQr(buildPersonalUrl(initialProfile.to, initialProfile.from, initialProfile.note, { lock: true, admin: false }));
   }
+
   setupReveal();
 })();
-  function setRecipientView(isLockedView) {
-    if (!isLockedView) {
-      return;
-    }
-    if (shareSection) {
-      shareSection.hidden = true;
-    }
-    if (shareNavLink) {
-      shareNavLink.hidden = true;
-    }
-  }
