@@ -55,4 +55,5 @@ When the other person scans the QR, the same personalized page opens.
    - edit song names inline
    - click each song's `Link` button and set a SoundCloud track/playlist URL
    - click song names to switch the embedded player instantly
+   - when one song ends, next song auto-plays
 5. The locked QR auto-refreshes after changes.

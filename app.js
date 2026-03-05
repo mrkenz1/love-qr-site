@@ -35,6 +35,8 @@
   const shareNavLink = document.getElementById("shareNavLink");
 
   let isAdminMode = false;
+  let soundcloudWidget = null;
+  let soundcloudWidgetReady = false;
 
   const DEFAULT_PROFILE = {
     to: "My Love",
@@ -135,22 +137,113 @@
     }
   }
 
-  function toSoundcloudEmbedUrl(rawUrl) {
+  function normalizeSoundcloudTarget(rawUrl) {
     const source = safeText(rawUrl, "");
     if (!source) {
       return "";
     }
 
-    if (source.includes("w.soundcloud.com/player/")) {
+    try {
+      const url = new URL(source);
+      if (url.hostname.includes("w.soundcloud.com") && url.pathname.includes("/player/")) {
+        const inner = url.searchParams.get("url");
+        return safeText(inner, source);
+      }
+    } catch (_error) {
       return source;
     }
 
-    const encoded = encodeURIComponent(source);
-    return `https://w.soundcloud.com/player/?url=${encoded}&color=%23e53a78&auto_play=true&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true`;
+    return source;
   }
 
-  function setSoundcloudSource(source) {
-    const normalized = safeText(source, "");
+  function toSoundcloudEmbedUrl(rawUrl, autoPlay = true) {
+    const target = normalizeSoundcloudTarget(rawUrl);
+    if (!target) {
+      return "";
+    }
+
+    const encoded = encodeURIComponent(target);
+    const autoPlayValue = autoPlay ? "true" : "false";
+    return `https://w.soundcloud.com/player/?url=${encoded}&color=%23e53a78&auto_play=${autoPlayValue}&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true`;
+  }
+
+  function getSoundcloudLoadOptions(autoPlay = true) {
+    return {
+      auto_play: autoPlay,
+      color: "#e53a78",
+      show_comments: false,
+      show_user: true,
+      show_reposts: false,
+      show_teaser: true,
+      visual: true
+    };
+  }
+
+  function playNextSong() {
+    const songs = getSongItems();
+    if (!songs.length) {
+      return;
+    }
+
+    const currentIndex = Math.max(0, getActiveSongIndex());
+    for (let step = 1; step <= songs.length; step += 1) {
+      const nextIndex = (currentIndex + step) % songs.length;
+      const candidate = songs[nextIndex];
+      const entry = songEntryFromItem(candidate);
+      if (!entry.scUrl) {
+        continue;
+      }
+      setSong(candidate, { syncQr: isAdminMode, showMissing: false, autoPlay: true });
+      showPlayerStatus("Daraa song auto togloj baina.");
+      return;
+    }
+
+    showPlayerStatus("Auto-next hiih song link oldsongui.", true);
+  }
+
+  function bindSoundcloudWidgetEvents() {
+    if (!soundcloudWidget || !window.SC || !window.SC.Widget) {
+      return;
+    }
+
+    soundcloudWidget.bind(window.SC.Widget.Events.READY, () => {
+      soundcloudWidgetReady = true;
+    });
+
+    soundcloudWidget.bind(window.SC.Widget.Events.PLAY, () => {
+      showPlayerStatus("Playing.");
+    });
+
+    soundcloudWidget.bind(window.SC.Widget.Events.FINISH, () => {
+      playNextSong();
+    });
+
+    soundcloudWidget.bind(window.SC.Widget.Events.ERROR, () => {
+      showPlayerStatus("SoundCloud aldaa garlaa. Link-ee shalgana uu.", true);
+    });
+  }
+
+  function initSoundcloudWidget() {
+    if (!soundcloudEmbed) {
+      return false;
+    }
+
+    if (!window.SC || !window.SC.Widget) {
+      return false;
+    }
+
+    if (soundcloudWidget) {
+      return true;
+    }
+
+    soundcloudWidget = window.SC.Widget(soundcloudEmbed);
+    bindSoundcloudWidgetEvents();
+    return true;
+  }
+
+  function setSoundcloudSource(source, options = {}) {
+    const { autoPlay = true } = options;
+    const normalized = normalizeSoundcloudTarget(source);
     if (!soundcloudEmbed) {
       return;
     }
@@ -162,9 +255,18 @@
       return;
     }
 
-    const embedUrl = toSoundcloudEmbedUrl(normalized);
     soundcloudEmbed.setAttribute("data-source", normalized);
+    const embedUrl = toSoundcloudEmbedUrl(normalized, autoPlay);
+
+    if (initSoundcloudWidget() && soundcloudWidget && soundcloudWidgetReady) {
+      soundcloudWidget.load(normalized, getSoundcloudLoadOptions(autoPlay));
+      return;
+    }
+
     soundcloudEmbed.src = embedUrl;
+    setTimeout(() => {
+      initSoundcloudWidget();
+    }, 350);
   }
 
   function songEntryFromItem(item, fallback = {}) {
@@ -618,7 +720,7 @@
   }
 
   function setSong(item, options = {}) {
-    const { syncQr = false, showMissing = true } = options;
+    const { syncQr = false, showMissing = true, autoPlay = true } = options;
 
     getSongItems().forEach((node) => node.classList.remove("active"));
     item.classList.add("active");
@@ -636,7 +738,7 @@
         showPlayerStatus("Song link alga. Admin mode дээр Link дарж SoundCloud URL оруул.", true);
       }
     } else {
-      setSoundcloudSource(entry.scUrl);
+      setSoundcloudSource(entry.scUrl, { autoPlay });
       showPlayerStatus("Song soligdloo.");
     }
 
@@ -660,7 +762,7 @@
     }
 
     if (active) {
-      setSong(active, { syncQr: false, showMissing: false });
+      setSong(active, { syncQr: false, showMissing: false, autoPlay: false });
     }
   }
 
