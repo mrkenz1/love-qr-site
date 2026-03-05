@@ -40,6 +40,7 @@
   let soundcloudWidgetReady = false;
   let usingQrFallbackImage = false;
   let lastQrFallbackUrl = "";
+  let qrFallbackCandidates = [];
 
   const DEFAULT_PROFILE = {
     to: "My Love",
@@ -1133,9 +1134,13 @@
     }
 
     const marginModules = 4;
-    const targetSize = 360;
+    const targetSize = 420;
     const totalModules = moduleCount + marginModules * 2;
-    const cellSize = Math.max(2, Math.floor(targetSize / totalModules));
+    const baseCellSize = Math.floor(targetSize / totalModules);
+    if (baseCellSize < 4 || moduleCount > 85 || url.length > 1200) {
+      return false;
+    }
+    const cellSize = baseCellSize;
     const canvasSize = cellSize * totalModules;
 
     qrCanvas.width = canvasSize;
@@ -1165,7 +1170,8 @@
     for (let row = 0; row < moduleCount; row += 1) {
       for (let col = 0; col < moduleCount; col += 1) {
         const index = row * moduleCount + col;
-        if (!modules[index]) {
+        const isDark = typeof qrData.modules.get === "function" ? qrData.modules.get(row, col) : !!modules[index];
+        if (!isDark) {
           continue;
         }
 
@@ -1199,9 +1205,12 @@
     return true;
   }
 
-  function buildFallbackQrImageUrl(url) {
+  function buildFallbackQrImageUrls(url) {
     const encoded = encodeURIComponent(url);
-    return `https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&ecc=M&format=png&data=${encoded}`;
+    return [
+      `https://quickchart.io/qr?text=${encoded}&size=1024&margin=2&ecLevel=L&dark=%23c81f5e&light=%23fff9fc`,
+      `https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&ecc=L&format=png&color=c81f5e&bgcolor=fff9fc&data=${encoded}`
+    ];
   }
 
   function showFallbackQr(url) {
@@ -1209,10 +1218,34 @@
       return false;
     }
 
-    lastQrFallbackUrl = buildFallbackQrImageUrl(url);
-    qrFallbackImage.src = lastQrFallbackUrl;
+    qrFallbackCandidates = buildFallbackQrImageUrls(url);
+    if (!qrFallbackCandidates.length) {
+      return false;
+    }
+
+    const tryNext = () => {
+      if (qrFallbackCandidates.length === 0) {
+        usingQrFallbackImage = false;
+        lastQrFallbackUrl = "";
+        showStatus("QR image fallback failed. Link-ee bogino bolgood dahin oroldooroi.", true);
+        return;
+      }
+      lastQrFallbackUrl = qrFallbackCandidates.shift() || "";
+      qrFallbackImage.src = lastQrFallbackUrl;
+    };
+
+    qrFallbackImage.onload = () => {
+      usingQrFallbackImage = true;
+      setQrDisplayMode(true);
+    };
+
+    qrFallbackImage.onerror = () => {
+      tryNext();
+    };
+
     usingQrFallbackImage = true;
     setQrDisplayMode(true);
+    tryNext();
     return true;
   }
 
@@ -1232,21 +1265,29 @@
       return;
     }
 
-    if (renderHeartStyleQr(url)) {
-      usingQrFallbackImage = false;
-      lastQrFallbackUrl = "";
-      setQrDisplayMode(false);
-      showStatus("Heart style QR ready. Send this image.");
-      return;
+    if (url.length <= 1200) {
+      try {
+        if (renderHeartStyleQr(url)) {
+          usingQrFallbackImage = false;
+          lastQrFallbackUrl = "";
+          setQrDisplayMode(false);
+          showStatus("Heart style QR ready. Send this image.");
+          return;
+        }
+      } catch (_error) {
+        // Fallback to standard QR renderer below.
+      }
     }
+
+    const standardWidth = url.length > 2200 ? 640 : url.length > 1500 ? 540 : 420;
 
     window.QRCode.toCanvas(
       qrCanvas,
       url,
       {
-        width: 320,
+        width: standardWidth,
         margin: 2,
-        errorCorrectionLevel: "M",
+        errorCorrectionLevel: "L",
         color: {
           dark: "#c81f5e",
           light: "#fff9fc"
