@@ -94,47 +94,26 @@
         <div class="player-box">
           <p class="player-title" id="nowPlaying">Timeless Love Song</p>
           <p class="player-artist" id="nowArtist">Your Playlist</p>
-          <p id="playerStatus" class="player-status">Select a song and press Play.</p>
-          <audio id="audioPlayer" preload="metadata"></audio>
-          <div class="player-controls">
-            <button id="playPauseBtn" class="btn btn-primary" type="button">Play</button>
-            <div class="progress-track">
-              <div id="progressBar" class="progress-bar"></div>
-            </div>
+          <p id="playerStatus" class="player-status">Song name deer darj SoundCloud player solino.</p>
+          <div class="embed-wrap playlist-embed">
+            <iframe
+              id="soundcloudEmbed"
+              title="SoundCloud Playlist"
+              data-source="https://soundcloud.com/chillhopdotcom/sets/lofi-beats"
+              src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/chillhopdotcom/sets/lofi-beats&color=%23e53a78&auto_play=true&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true"
+              loading="lazy"
+              allow="autoplay"
+              frameborder="no">
+            </iframe>
           </div>
         </div>
 
         <ul class="song-list" id="songList">
-          <li class="song-item active" data-song="Timeless Love Song" data-artist="Your Playlist" data-src="./assets/music/song-1.mp3">Timeless Love Song</li>
-          <li class="song-item" data-song="You and Me" data-artist="Your Playlist" data-src="./assets/music/song-2.mp3">You and Me</li>
-          <li class="song-item" data-song="Always in My Heart" data-artist="Your Playlist" data-src="./assets/music/song-3.mp3">Always in My Heart</li>
-          <li class="song-item" data-song="Forever Starts Tonight" data-artist="Your Playlist" data-src="./assets/music/song-4.mp3">Forever Starts Tonight</li>
+          <li class="song-item active" data-song="Timeless Love Song" data-artist="Your Playlist" data-sc-url="https://soundcloud.com/chillhopdotcom/sets/lofi-beats">Timeless Love Song</li>
+          <li class="song-item" data-song="You and Me" data-artist="Your Playlist" data-sc-url="https://soundcloud.com/mtmarcy/sets/mellow-love">You and Me</li>
+          <li class="song-item" data-song="Always in My Heart" data-artist="Your Playlist" data-sc-url="https://soundcloud.com/sensualmusique/sets/love-songs">Always in My Heart</li>
+          <li class="song-item" data-song="Forever Starts Tonight" data-artist="Your Playlist" data-sc-url="https://soundcloud.com/majesticcasual/sets/majestic-casual-playlist">Forever Starts Tonight</li>
         </ul>
-      </div>
-    </section>
-
-    <section id="playlistEmbed" class="section card" data-reveal>
-      <div class="section-head">
-        <h2>SoundCloud Playlist</h2>
-        <p class="section-note">Live embed player for your shared page</p>
-      </div>
-
-      <div class="embed-wrap">
-        <iframe
-          id="soundcloudEmbed"
-          title="SoundCloud Playlist"
-          data-source="https://soundcloud.com/chillhopdotcom/sets/lofi-beats"
-          src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/chillhopdotcom/sets/lofi-beats&color=%23e53a78&auto_play=false&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true"
-          loading="lazy"
-          allow="autoplay"
-          frameborder="no">
-        </iframe>
-      </div>
-
-      <div id="embedAdminControls" class="embed-admin" hidden>
-        <label for="soundcloudUrlInput">SoundCloud track/playlist URL</label>
-        <input id="soundcloudUrlInput" type="text" placeholder="https://soundcloud.com/.../sets/...">
-        <button id="applySoundcloudBtn" class="btn btn-secondary" type="button">Apply SoundCloud URL</button>
       </div>
     </section>
 

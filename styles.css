@@ -348,7 +348,7 @@ body.admin-mode .song-src-btn {
   display: inline-flex;
 }
 
-.song-item[data-empty-src="1"] {
+.song-item[data-empty-url="1"] {
   border: 1px dashed #d14e80;
 }
 
@@ -365,6 +365,10 @@ body.admin-mode .song-src-btn {
   min-height: 360px;
   border: 0;
   display: block;
+}
+
+.playlist-embed #soundcloudEmbed {
+  min-height: 320px;
 }
 
 .embed-admin {

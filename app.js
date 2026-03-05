@@ -18,14 +18,8 @@
   const songList = document.getElementById("songList");
   const nowPlaying = document.getElementById("nowPlaying");
   const nowArtist = document.getElementById("nowArtist");
-  const playPauseBtn = document.getElementById("playPauseBtn");
-  const progressBar = document.getElementById("progressBar");
   const playerStatus = document.getElementById("playerStatus");
-  const audioPlayer = document.getElementById("audioPlayer");
   const soundcloudEmbed = document.getElementById("soundcloudEmbed");
-  const soundcloudUrlInput = document.getElementById("soundcloudUrlInput");
-  const applySoundcloudBtn = document.getElementById("applySoundcloudBtn");
-  const embedAdminControls = document.getElementById("embedAdminControls");
 
   const shareForm = document.getElementById("shareForm");
   const toInput = document.getElementById("toInput");
@@ -40,7 +34,6 @@
   const shareSection = document.getElementById("share");
   const shareNavLink = document.getElementById("shareNavLink");
 
-  let isPlaying = false;
   let isAdminMode = false;
 
   const DEFAULT_PROFILE = {
@@ -70,41 +63,36 @@
     return item.querySelector(".song-name");
   }
 
-  function songEntryFromItem(item, fallback = {}) {
-    const defaultName = fallback.name || "Untitled Song";
-    const defaultArtist = fallback.artist || "Your Playlist";
-    const defaultSrc = fallback.src || "";
-
-    const nameNode = getSongNameNode(item);
-    const visualName = nameNode ? nameNode.textContent : item.textContent;
-
-    return {
-      name: safeText(item.getAttribute("data-song") || visualName, defaultName),
-      artist: safeText(item.getAttribute("data-artist"), defaultArtist),
-      src: safeText(item.getAttribute("data-src"), defaultSrc)
-    };
+  function showStatus(message, isError = false) {
+    if (!shareStatus) {
+      return;
+    }
+    shareStatus.textContent = message;
+    shareStatus.style.color = isError ? "#9f103f" : "#c81f5e";
   }
 
-  function readDefaultContent() {
-    const defaultSoundcloudSource = safeText(
-      soundcloudEmbed?.getAttribute("data-source"),
-      "https://soundcloud.com/chillhopdotcom/sets/lofi-beats"
-    );
-
-    return {
-      heroSubtext: safeText(heroSubtext?.textContent, "Every love story is beautiful, but ours is my favorite."),
-      letters: getLetterBlocks().map((p) => safeText(p.textContent, "")),
-      songs: getSongItems().map((item) => songEntryFromItem(item)),
-      soundcloudSource: defaultSoundcloudSource,
-      memories: getMemoryCards().map((card) => ({
-        title: safeText(card.getAttribute("data-title"), "Memory"),
-        caption: safeText(card.getAttribute("data-caption"), ""),
-        image: safeText(card.getAttribute("data-image"), memoryFallbackImage)
-      }))
-    };
+  function showPlayerStatus(message, isError = false) {
+    if (!playerStatus) {
+      return;
+    }
+    playerStatus.textContent = message;
+    playerStatus.style.color = isError ? "#9f103f" : "#8f1d4f";
   }
 
-  const defaultContent = readDefaultContent();
+  function ensureImageFallback(imgElement) {
+    if (!imgElement || imgElement.dataset.fallbackBound === "1") {
+      return;
+    }
+
+    imgElement.addEventListener("error", () => {
+      if (imgElement.src.endsWith("memory-fallback.svg")) {
+        return;
+      }
+      imgElement.src = memoryFallbackImage;
+    });
+
+    imgElement.dataset.fallbackBound = "1";
+  }
 
   function utf8ToBase64Url(value) {
     const bytes = new TextEncoder().encode(value);
@@ -147,66 +135,8 @@
     }
   }
 
-  function readParams() {
-    const params = new URLSearchParams(window.location.search);
-    return {
-      to: safeText(params.get("to"), DEFAULT_PROFILE.to),
-      from: safeText(params.get("from"), DEFAULT_PROFILE.from),
-      note: safeText(params.get("note"), DEFAULT_PROFILE.note),
-      lock: params.get("lock") === "1",
-      admin: params.get("admin") === "1",
-      cfg: decodeCfg(params.get("cfg"))
-    };
-  }
-
-  function applyProfile(profile) {
-    recipientHeading.textContent = profile.to;
-    recipientInline.textContent = profile.to;
-    fromSignature.textContent = profile.from;
-
-    if (profile.note) {
-      customNote.hidden = false;
-      customNote.textContent = profile.note;
-    } else {
-      customNote.hidden = true;
-      customNote.textContent = "";
-    }
-
-    toInput.value = profile.to === DEFAULT_PROFILE.to ? "" : profile.to;
-    fromInput.value = profile.from === DEFAULT_PROFILE.from ? "" : profile.from;
-    noteInput.value = profile.note;
-  }
-
-  function ensureImageFallback(imgElement) {
-    if (!imgElement || imgElement.dataset.fallbackBound === "1") {
-      return;
-    }
-
-    imgElement.addEventListener("error", () => {
-      if (imgElement.src.endsWith("memory-fallback.svg")) {
-        return;
-      }
-      imgElement.src = memoryFallbackImage;
-    });
-
-    imgElement.dataset.fallbackBound = "1";
-  }
-
-  function showStatus(message, isError = false) {
-    shareStatus.textContent = message;
-    shareStatus.style.color = isError ? "#9f103f" : "#c81f5e";
-  }
-
-  function showPlayerStatus(message, isError = false) {
-    if (!playerStatus) {
-      return;
-    }
-    playerStatus.textContent = message;
-    playerStatus.style.color = isError ? "#9f103f" : "#8f1d4f";
-  }
-
   function toSoundcloudEmbedUrl(rawUrl) {
-    const source = safeText(rawUrl, defaultContent.soundcloudSource);
+    const source = safeText(rawUrl, "");
     if (!source) {
       return "";
     }
@@ -216,54 +146,99 @@
     }
 
     const encoded = encodeURIComponent(source);
-    return `https://w.soundcloud.com/player/?url=${encoded}&color=%23e53a78&auto_play=false&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true`;
+    return `https://w.soundcloud.com/player/?url=${encoded}&color=%23e53a78&auto_play=true&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true`;
   }
 
   function setSoundcloudSource(source) {
-    const normalizedSource = safeText(source, defaultContent.soundcloudSource);
-    const embedUrl = toSoundcloudEmbedUrl(normalizedSource);
-
-    if (soundcloudEmbed) {
-      soundcloudEmbed.setAttribute("data-source", normalizedSource);
-      soundcloudEmbed.src = embedUrl;
+    const normalized = safeText(source, "");
+    if (!soundcloudEmbed) {
+      return;
     }
 
-    if (soundcloudUrlInput) {
-      soundcloudUrlInput.value = normalizedSource;
+    if (!normalized) {
+      soundcloudEmbed.removeAttribute("src");
+      soundcloudEmbed.setAttribute("data-source", "");
+      showPlayerStatus("SoundCloud URL alga. Admin: Link tovchoor nemeerei.", true);
+      return;
     }
+
+    const embedUrl = toSoundcloudEmbedUrl(normalized);
+    soundcloudEmbed.setAttribute("data-source", normalized);
+    soundcloudEmbed.src = embedUrl;
   }
 
-  function normalizeSongConfig(raw, fallback = {}) {
+  function songEntryFromItem(item, fallback = {}) {
+    const nameNode = getSongNameNode(item);
+    const visualName = nameNode ? nameNode.textContent : item.textContent;
+
+    return {
+      name: safeText(item.getAttribute("data-song") || visualName, fallback.name || "Untitled Song"),
+      artist: safeText(item.getAttribute("data-artist"), fallback.artist || "Your Playlist"),
+      scUrl: safeText(item.getAttribute("data-sc-url"), fallback.scUrl || "")
+    };
+  }
+
+  function normalizeSong(raw, fallback = {}) {
     if (typeof raw === "string") {
       return {
         name: safeText(raw, fallback.name || "Untitled Song"),
         artist: safeText(fallback.artist, "Your Playlist"),
-        src: safeText(fallback.src, "")
+        scUrl: safeText(fallback.scUrl, "")
       };
     }
 
     if (raw && typeof raw === "object") {
+      const urlCandidate = raw.scUrl ?? raw.src ?? "";
       return {
         name: safeText(raw.name, fallback.name || "Untitled Song"),
         artist: safeText(raw.artist, fallback.artist || "Your Playlist"),
-        src: safeText(raw.src, fallback.src || "")
+        scUrl: safeText(urlCandidate, fallback.scUrl || "")
       };
     }
 
     return {
       name: safeText(fallback.name, "Untitled Song"),
       artist: safeText(fallback.artist, "Your Playlist"),
-      src: safeText(fallback.src, "")
+      scUrl: safeText(fallback.scUrl, "")
     };
   }
 
   function refreshSongVisual(item) {
-    const src = safeText(item.getAttribute("data-src"), "");
-    if (src) {
-      item.removeAttribute("data-empty-src");
+    const url = safeText(item.getAttribute("data-sc-url"), "");
+    if (url) {
+      item.removeAttribute("data-empty-url");
     } else {
-      item.setAttribute("data-empty-src", "1");
+      item.setAttribute("data-empty-url", "1");
     }
+  }
+
+  function refreshActiveSongHeading() {
+    const active = document.querySelector(".song-item.active");
+    if (!active) {
+      return;
+    }
+
+    const entry = songEntryFromItem(active);
+    if (nowPlaying) {
+      nowPlaying.textContent = entry.name;
+    }
+    if (nowArtist) {
+      nowArtist.textContent = entry.artist;
+    }
+  }
+
+  function setSongDataOnItem(item, song) {
+    const normalized = normalizeSong(song);
+    item.setAttribute("data-song", normalized.name);
+    item.setAttribute("data-artist", normalized.artist);
+    item.setAttribute("data-sc-url", normalized.scUrl);
+
+    const nameNode = getSongNameNode(item);
+    if (nameNode) {
+      nameNode.textContent = normalized.name;
+    }
+
+    refreshSongVisual(item);
   }
 
   function ensureSongMarkup(item) {
@@ -271,24 +246,25 @@
     if (!nameNode) {
       const initialName = safeText(item.getAttribute("data-song") || item.textContent, "Untitled Song");
       item.textContent = "";
+
       nameNode = document.createElement("span");
       nameNode.className = "song-name";
       nameNode.textContent = initialName;
       item.appendChild(nameNode);
     }
 
-    let srcBtn = item.querySelector(".song-src-btn");
-    if (!srcBtn) {
-      srcBtn = document.createElement("button");
-      srcBtn.type = "button";
-      srcBtn.className = "song-src-btn";
-      srcBtn.textContent = "Audio";
-      srcBtn.setAttribute("aria-label", "Edit audio source");
-      item.appendChild(srcBtn);
+    let linkBtn = item.querySelector(".song-src-btn");
+    if (!linkBtn) {
+      linkBtn = document.createElement("button");
+      linkBtn.type = "button";
+      linkBtn.className = "song-src-btn";
+      linkBtn.textContent = "Link";
+      linkBtn.setAttribute("aria-label", "Edit SoundCloud link");
+      item.appendChild(linkBtn);
     }
 
     if (item.dataset.songBound !== "1") {
-      srcBtn.addEventListener("click", (event) => {
+      linkBtn.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
 
@@ -296,17 +272,17 @@
           return;
         }
 
-        const current = safeText(item.getAttribute("data-src"), "");
-        const next = window.prompt("Audio URL or path (example: ./assets/music/song-1.mp3)", current);
+        const current = safeText(item.getAttribute("data-sc-url"), "");
+        const next = window.prompt("SoundCloud track or playlist URL", current);
         if (next === null) {
           return;
         }
 
-        item.setAttribute("data-src", safeText(next, ""));
+        item.setAttribute("data-sc-url", safeText(next, ""));
         refreshSongVisual(item);
 
         if (item.classList.contains("active")) {
-          setSong(item, { autoplay: false, showMissing: false });
+          setSong(item, { syncQr: false, showMissing: true });
         }
 
         refreshAdminQr();
@@ -318,23 +294,70 @@
     refreshSongVisual(item);
   }
 
-  function setSongEntryOnItem(item, entry) {
-    const normalized = normalizeSongConfig(entry);
-    item.setAttribute("data-song", normalized.name);
-    item.setAttribute("data-artist", normalized.artist);
-    item.setAttribute("data-src", normalized.src);
-
-    ensureSongMarkup(item);
-    const nameNode = getSongNameNode(item);
-    if (nameNode) {
-      nameNode.textContent = normalized.name;
-    }
-
-    refreshSongVisual(item);
+  function getActiveSongIndex() {
+    const songs = getSongItems();
+    return songs.findIndex((item) => item.classList.contains("active"));
   }
 
-  function getActiveSongItem() {
-    return document.querySelector(".song-item.active");
+  function readDefaultContent() {
+    return {
+      heroSubtext: safeText(heroSubtext?.textContent, "Every love story is beautiful, but ours is my favorite."),
+      letters: getLetterBlocks().map((p) => safeText(p.textContent, "")),
+      songs: getSongItems().map((item) => songEntryFromItem(item)),
+      activeSongIndex: Math.max(0, getActiveSongIndex()),
+      memories: getMemoryCards().map((card) => ({
+        title: safeText(card.getAttribute("data-title"), "Memory"),
+        caption: safeText(card.getAttribute("data-caption"), ""),
+        image: safeText(card.getAttribute("data-image"), memoryFallbackImage)
+      }))
+    };
+  }
+
+  getSongItems().forEach((item) => ensureSongMarkup(item));
+  const defaultContent = readDefaultContent();
+
+  function applyProfile(profile) {
+    if (recipientHeading) {
+      recipientHeading.textContent = profile.to;
+    }
+    if (recipientInline) {
+      recipientInline.textContent = profile.to;
+    }
+    if (fromSignature) {
+      fromSignature.textContent = profile.from;
+    }
+
+    if (customNote) {
+      if (profile.note) {
+        customNote.hidden = false;
+        customNote.textContent = profile.note;
+      } else {
+        customNote.hidden = true;
+        customNote.textContent = "";
+      }
+    }
+
+    if (toInput) {
+      toInput.value = profile.to === DEFAULT_PROFILE.to ? "" : profile.to;
+    }
+    if (fromInput) {
+      fromInput.value = profile.from === DEFAULT_PROFILE.from ? "" : profile.from;
+    }
+    if (noteInput) {
+      noteInput.value = profile.note;
+    }
+  }
+
+  function readParams() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      to: safeText(params.get("to"), DEFAULT_PROFILE.to),
+      from: safeText(params.get("from"), DEFAULT_PROFILE.from),
+      note: safeText(params.get("note"), DEFAULT_PROFILE.note),
+      lock: params.get("lock") === "1",
+      admin: params.get("admin") === "1",
+      cfg: decodeCfg(params.get("cfg"))
+    };
   }
 
   function applyCfg(cfg) {
@@ -360,13 +383,8 @@
       const songs = getSongItems();
       songs.forEach((item, index) => {
         const fallback = defaultContent.songs[index] || songEntryFromItem(item);
-        const next = normalizeSongConfig(cfg.songs[index], fallback);
-        setSongEntryOnItem(item, next);
+        setSongDataOnItem(item, normalizeSong(cfg.songs[index], fallback));
       });
-    }
-
-    if (typeof cfg.soundcloudSource === "string") {
-      setSoundcloudSource(cfg.soundcloudSource);
     }
 
     if (Array.isArray(cfg.memories)) {
@@ -397,6 +415,28 @@
         }
       });
     }
+
+    if (Number.isInteger(cfg.activeSongIndex)) {
+      const songs = getSongItems();
+      const idx = Math.max(0, Math.min(songs.length - 1, cfg.activeSongIndex));
+      songs.forEach((item, i) => {
+        item.classList.toggle("active", i === idx);
+      });
+    }
+  }
+
+  function collectCfgFromDom() {
+    return {
+      heroSubtext: safeText(heroSubtext?.textContent, defaultContent.heroSubtext),
+      letters: getLetterBlocks().map((p, index) => safeText(p.textContent, defaultContent.letters[index] || "")),
+      songs: getSongItems().map((item, index) => songEntryFromItem(item, defaultContent.songs[index] || {})),
+      activeSongIndex: Math.max(0, getActiveSongIndex()),
+      memories: getMemoryCards().map((card, index) => ({
+        title: safeText(card.getAttribute("data-title"), defaultContent.memories[index]?.title || "Memory"),
+        caption: safeText(card.getAttribute("data-caption"), defaultContent.memories[index]?.caption || ""),
+        image: safeText(card.getAttribute("data-image"), defaultContent.memories[index]?.image || memoryFallbackImage)
+      }))
+    };
   }
 
   function compactCfg(cfg) {
@@ -414,8 +454,8 @@
       compact.songs = cfg.songs;
     }
 
-    if (cfg.soundcloudSource !== defaultContent.soundcloudSource) {
-      compact.soundcloudSource = cfg.soundcloudSource;
+    if (cfg.activeSongIndex !== defaultContent.activeSongIndex) {
+      compact.activeSongIndex = cfg.activeSongIndex;
     }
 
     if (JSON.stringify(cfg.memories) !== JSON.stringify(defaultContent.memories)) {
@@ -423,23 +463,6 @@
     }
 
     return compact;
-  }
-
-  function collectCfgFromDom() {
-    return {
-      heroSubtext: safeText(heroSubtext?.textContent, defaultContent.heroSubtext),
-      letters: getLetterBlocks().map((p, index) => safeText(p.textContent, defaultContent.letters[index] || "")),
-      songs: getSongItems().map((item, index) => songEntryFromItem(item, defaultContent.songs[index])),
-      soundcloudSource: safeText(
-        soundcloudEmbed?.getAttribute("data-source"),
-        defaultContent.soundcloudSource
-      ),
-      memories: getMemoryCards().map((card, index) => ({
-        title: safeText(card.getAttribute("data-title"), defaultContent.memories[index]?.title || "Memory"),
-        caption: safeText(card.getAttribute("data-caption"), defaultContent.memories[index]?.caption || ""),
-        image: safeText(card.getAttribute("data-image"), defaultContent.memories[index]?.image || memoryFallbackImage)
-      }))
-    };
   }
 
   function buildUrl(profile, cfg, options = {}) {
@@ -472,6 +495,10 @@
   }
 
   function renderQr(url) {
+    if (!shareUrl || !qrCanvas) {
+      return;
+    }
+
     shareUrl.value = url;
 
     if (!window.QRCode || !window.QRCode.toCanvas) {
@@ -502,9 +529,9 @@
 
   function getCurrentProfileFromInputs() {
     return {
-      to: safeText(toInput.value, DEFAULT_PROFILE.to),
-      from: safeText(fromInput.value, DEFAULT_PROFILE.from),
-      note: safeText(noteInput.value, DEFAULT_PROFILE.note)
+      to: safeText(toInput?.value, DEFAULT_PROFILE.to),
+      from: safeText(fromInput?.value, DEFAULT_PROFILE.from),
+      note: safeText(noteInput?.value, DEFAULT_PROFILE.note)
     };
   }
 
@@ -527,7 +554,7 @@
   }
 
   async function copyLink() {
-    const url = shareUrl.value;
+    const url = shareUrl?.value;
     if (!url) {
       showStatus("Generate a link first.", true);
       return;
@@ -536,7 +563,7 @@
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(url);
-      } else {
+      } else if (shareUrl) {
         shareUrl.focus();
         shareUrl.select();
         const ok = document.execCommand("copy");
@@ -551,7 +578,7 @@
   }
 
   function downloadQr() {
-    if (!shareUrl.value) {
+    if (!shareUrl?.value || !qrCanvas) {
       showStatus("Generate a link first.", true);
       return;
     }
@@ -567,7 +594,7 @@
   }
 
   async function nativeShare() {
-    const url = shareUrl.value;
+    const url = shareUrl?.value;
     if (!url) {
       showStatus("Generate a link first.", true);
       return;
@@ -590,112 +617,51 @@
     }
   }
 
-  function setPlayingState(next) {
-    isPlaying = next;
-    playPauseBtn.textContent = isPlaying ? "Pause" : "Play";
-  }
-
-  function updateProgressFromAudio() {
-    if (!audioPlayer || !Number.isFinite(audioPlayer.duration) || audioPlayer.duration <= 0) {
-      progressBar.style.width = "0%";
-      return;
-    }
-
-    const pct = Math.max(0, Math.min(100, (audioPlayer.currentTime / audioPlayer.duration) * 100));
-    progressBar.style.width = `${pct}%`;
-  }
-
-  function applySongToHeader(item) {
-    const entry = songEntryFromItem(item);
-    nowPlaying.textContent = entry.name;
-    nowArtist.textContent = entry.artist;
-  }
-
-  function loadAudioForSong(item) {
-    const entry = songEntryFromItem(item);
-    if (!entry.src) {
-      if (audioPlayer) {
-        audioPlayer.pause();
-        audioPlayer.removeAttribute("src");
-        audioPlayer.dataset.songSrc = "";
-        audioPlayer.load();
-      }
-      progressBar.style.width = "0%";
-      return false;
-    }
-
-    if (audioPlayer && audioPlayer.dataset.songSrc !== entry.src) {
-      audioPlayer.pause();
-      audioPlayer.src = entry.src;
-      audioPlayer.dataset.songSrc = entry.src;
-      audioPlayer.load();
-      progressBar.style.width = "0%";
-    }
-
-    return true;
-  }
-
   function setSong(item, options = {}) {
-    const { autoplay = true, showMissing = true } = options;
+    const { syncQr = false, showMissing = true } = options;
 
-    document.querySelectorAll(".song-item").forEach((node) => node.classList.remove("active"));
+    getSongItems().forEach((node) => node.classList.remove("active"));
     item.classList.add("active");
-    applySongToHeader(item);
 
-    const hasSource = loadAudioForSong(item);
-    if (!hasSource) {
-      setPlayingState(false);
+    const entry = songEntryFromItem(item);
+    if (nowPlaying) {
+      nowPlaying.textContent = entry.name;
+    }
+    if (nowArtist) {
+      nowArtist.textContent = entry.artist;
+    }
+
+    if (!entry.scUrl) {
       if (showMissing) {
-        showPlayerStatus("No audio source. Admin mode: set Audio path.", true);
+        showPlayerStatus("Song link alga. Admin mode дээр Link дарж SoundCloud URL оруул.", true);
       }
-      return;
+    } else {
+      setSoundcloudSource(entry.scUrl);
+      showPlayerStatus("Song soligdloo.");
     }
 
-    if (!audioPlayer) {
-      return;
+    if (syncQr && isAdminMode) {
+      refreshAdminQr();
     }
-
-    if (!autoplay) {
-      setPlayingState(!audioPlayer.paused);
-      showPlayerStatus("Audio ready.");
-      return;
-    }
-
-    audioPlayer.play()
-      .then(() => {
-        setPlayingState(true);
-        showPlayerStatus("Playing.");
-      })
-      .catch(() => {
-        setPlayingState(false);
-        showPlayerStatus("Could not play this audio. Check file path/format.", true);
-      });
   }
 
-  function togglePlay() {
-    const active = getActiveSongItem() || getSongItems()[0];
-    if (!active) {
-      return;
+  function setupSongUi() {
+    const songs = getSongItems();
+    songs.forEach((item, index) => {
+      const fallback = defaultContent.songs[index] || songEntryFromItem(item);
+      setSongDataOnItem(item, songEntryFromItem(item, fallback));
+      ensureSongMarkup(item);
+    });
+
+    let active = document.querySelector(".song-item.active");
+    if (!active && songs.length > 0) {
+      active = songs[0];
+      active.classList.add("active");
     }
 
-    if (!audioPlayer) {
-      return;
+    if (active) {
+      setSong(active, { syncQr: false, showMissing: false });
     }
-
-    const entry = songEntryFromItem(active);
-    if (!entry.src) {
-      showPlayerStatus("No audio source. Admin mode: set Audio path.", true);
-      return;
-    }
-
-    if (!audioPlayer.paused && audioPlayer.dataset.songSrc === entry.src) {
-      audioPlayer.pause();
-      setPlayingState(false);
-      showPlayerStatus("Paused.");
-      return;
-    }
-
-    setSong(active, { autoplay: true, showMissing: true });
   }
 
   function openModal(image, title, caption) {
@@ -749,6 +715,7 @@
     if (!node) {
       return;
     }
+
     node.contentEditable = "true";
     node.spellcheck = false;
     node.classList.add("admin-editable");
@@ -816,23 +783,6 @@
     });
   }
 
-  function setupSongUi() {
-    getSongItems().forEach((item, index) => {
-      const fallback = defaultContent.songs[index] || songEntryFromItem(item);
-      setSongEntryOnItem(item, songEntryFromItem(item, fallback));
-    });
-
-    const active = getActiveSongItem() || getSongItems()[0];
-    if (active && !getActiveSongItem()) {
-      active.classList.add("active");
-    }
-
-    const selected = getActiveSongItem() || getSongItems()[0];
-    if (selected) {
-      setSong(selected, { autoplay: false, showMissing: false });
-    }
-  }
-
   function enableAdminMode() {
     isAdminMode = true;
     document.body.classList.add("admin-mode");
@@ -852,30 +802,26 @@
         if (nameNode) {
           nameNode.textContent = songName;
         }
-
-        if (item.classList.contains("active")) {
-          nowPlaying.textContent = songName;
-        }
-
+        refreshActiveSongHeading();
         refreshAdminQr();
       });
     });
 
     addMemoryEditButtons();
-    if (embedAdminControls) {
-      embedAdminControls.hidden = false;
-    }
 
     [toInput, fromInput, noteInput].forEach((input) => {
+      if (!input) {
+        return;
+      }
       input.addEventListener("input", () => refreshAdminQr());
     });
 
-    showStatus("Admin mode active. Every change updates locked QR.");
-    showPlayerStatus("Admin mode: Edit song name inline, click Audio to set file path.");
+    showStatus("Admin mode active. Change buriin daraa QR auto shinechlэгдэнэ.");
+    showPlayerStatus("Song ner deer darj solino. Link tovchoor SoundCloud URL solino.");
   }
 
-  openLetterBtn.addEventListener("click", () => {
-    letterSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  openLetterBtn?.addEventListener("click", () => {
+    letterSection?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
   getMemoryCards().forEach((card) => {
@@ -893,8 +839,8 @@
     });
   });
 
-  closeModalBtn.addEventListener("click", closeModal);
-  memoryModal.addEventListener("click", (event) => {
+  closeModalBtn?.addEventListener("click", closeModal);
+  memoryModal?.addEventListener("click", (event) => {
     const target = event.target;
     if (target instanceof HTMLElement && target.hasAttribute("data-close-modal")) {
       closeModal();
@@ -902,86 +848,39 @@
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !memoryModal.hidden) {
+    if (event.key === "Escape" && memoryModal && !memoryModal.hidden) {
       closeModal();
     }
   });
 
-  if (songList) {
-    songList.addEventListener("click", (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) {
-        return;
-      }
+  songList?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
 
-      if (target.closest(".song-src-btn")) {
-        return;
-      }
+    if (target.closest(".song-src-btn")) {
+      return;
+    }
 
-      const item = target.closest(".song-item");
-      if (item) {
-        setSong(item, { autoplay: true, showMissing: true });
-      }
-    });
-  }
+    const item = target.closest(".song-item");
+    if (item) {
+      setSong(item, { syncQr: isAdminMode, showMissing: true });
+    }
+  });
 
-  playPauseBtn.addEventListener("click", togglePlay);
-
-  if (audioPlayer) {
-    audioPlayer.addEventListener("timeupdate", updateProgressFromAudio);
-    audioPlayer.addEventListener("play", () => {
-      setPlayingState(true);
-    });
-    audioPlayer.addEventListener("pause", () => {
-      setPlayingState(false);
-    });
-    audioPlayer.addEventListener("ended", () => {
-      setPlayingState(false);
-      progressBar.style.width = "0%";
-      showPlayerStatus("Playback ended.");
-    });
-    audioPlayer.addEventListener("error", () => {
-      setPlayingState(false);
-      showPlayerStatus("Audio failed to load. Check file path.", true);
-    });
-  }
-
-  shareForm.addEventListener("submit", (event) => {
+  shareForm?.addEventListener("submit", (event) => {
     event.preventDefault();
     refreshAdminQr();
   });
 
-  copyBtn.addEventListener("click", copyLink);
-  downloadQrBtn.addEventListener("click", downloadQr);
-  nativeShareBtn.addEventListener("click", nativeShare);
-
-  if (applySoundcloudBtn) {
-    applySoundcloudBtn.addEventListener("click", () => {
-      if (!isAdminMode) {
-        return;
-      }
-      setSoundcloudSource(soundcloudUrlInput?.value || "");
-      refreshAdminQr();
-      showStatus("SoundCloud embed updated.");
-    });
-  }
-
-  if (soundcloudUrlInput) {
-    soundcloudUrlInput.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" || !isAdminMode) {
-        return;
-      }
-      event.preventDefault();
-      setSoundcloudSource(soundcloudUrlInput.value);
-      refreshAdminQr();
-      showStatus("SoundCloud embed updated.");
-    });
-  }
+  copyBtn?.addEventListener("click", copyLink);
+  downloadQrBtn?.addEventListener("click", downloadQr);
+  nativeShareBtn?.addEventListener("click", nativeShare);
 
   const initialProfile = readParams();
   applyProfile(initialProfile);
   applyCfg(initialProfile.cfg);
-  setSoundcloudSource(soundcloudEmbed?.getAttribute("data-source") || defaultContent.soundcloudSource);
   setupSongUi();
 
   if (initialProfile.admin) {
@@ -994,7 +893,6 @@
     window.history.replaceState(null, "", adminUrl);
   } else {
     setToolsVisibility(false);
-    showPlayerStatus("Select a song and press Play.");
   }
 
   setupReveal();

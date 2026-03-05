@@ -49,13 +49,10 @@ When the other person scans the QR, the same personalized page opens.
 
 ## Add your photos and music
 1. Put photos in `assets/photos` (create the folder if needed).
-2. Put songs in `assets/music` (for example `song-1.mp3`, `song-2.mp3`).
-3. Open admin mode: `https://mrkenz1.github.io/love-qr-site/?admin=1`
-4. In Memories, click `Edit` to change image paths.
-5. In Playlist:
+2. Open admin mode: `https://mrkenz1.github.io/love-qr-site/?admin=1`
+3. In Memories, click `Edit` to change image paths.
+4. In Playlist:
    - edit song names inline
-   - click the `Audio` button on each song and set path like `./assets/music/song-1.mp3`
-6. In SoundCloud Playlist:
-   - paste a SoundCloud track/playlist URL
-   - click `Apply SoundCloud URL`
-7. The locked QR auto-refreshes after changes.
+   - click each song's `Link` button and set a SoundCloud track/playlist URL
+   - click song names to switch the embedded player instantly
+5. The locked QR auto-refreshes after changes.
