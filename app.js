@@ -965,9 +965,133 @@
     }
   }
 
+  function drawRoundedRect(ctx, x, y, size, radius) {
+    const r = Math.max(0, Math.min(radius, size / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + size, y, x + size, y + size, r);
+    ctx.arcTo(x + size, y + size, x, y + size, r);
+    ctx.arcTo(x, y + size, x, y, r);
+    ctx.arcTo(x, y, x + size, y, r);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawHeartPath(ctx, centerX, centerY, size) {
+    const h = size;
+    const w = size * 1.05;
+    const topY = centerY - h * 0.18;
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY + h * 0.38);
+    ctx.bezierCurveTo(centerX + w * 0.52, centerY + h * 0.04, centerX + w * 0.56, topY - h * 0.34, centerX, topY);
+    ctx.bezierCurveTo(centerX - w * 0.56, topY - h * 0.34, centerX - w * 0.52, centerY + h * 0.04, centerX, centerY + h * 0.38);
+    ctx.closePath();
+  }
+
+  function isStructuralQrModule(row, col, moduleCount) {
+    const inTopLeftFinder = row <= 8 && col <= 8;
+    const inTopRightFinder = row <= 8 && col >= moduleCount - 9;
+    const inBottomLeftFinder = row >= moduleCount - 9 && col <= 8;
+    const inTiming = row === 6 || col === 6;
+    return inTopLeftFinder || inTopRightFinder || inBottomLeftFinder || inTiming;
+  }
+
+  function isHeartQrModule(row, col, moduleCount) {
+    const nx = ((col + 0.5) / moduleCount) * 2 - 1;
+    const ny = ((row + 0.5) / moduleCount) * 2 - 1;
+    const y = ny * 1.24 + 0.1;
+    const heartValue = Math.pow(nx * nx + y * y - 1, 3) - nx * nx * Math.pow(y, 3);
+    return heartValue <= 0;
+  }
+
+  function renderHeartStyleQr(url) {
+    if (!window.QRCode || typeof window.QRCode.create !== "function" || !qrCanvas) {
+      return false;
+    }
+
+    let qrData;
+    try {
+      qrData = window.QRCode.create(url, { errorCorrectionLevel: "M" });
+    } catch (_error) {
+      return false;
+    }
+
+    const modules = qrData?.modules?.data;
+    const moduleCount = qrData?.modules?.size || 0;
+    if (!modules || !moduleCount) {
+      return false;
+    }
+
+    const marginModules = 4;
+    const targetSize = 360;
+    const totalModules = moduleCount + marginModules * 2;
+    const cellSize = Math.max(2, Math.floor(targetSize / totalModules));
+    const canvasSize = cellSize * totalModules;
+
+    qrCanvas.width = canvasSize;
+    qrCanvas.height = canvasSize;
+
+    const ctx = qrCanvas.getContext("2d");
+    if (!ctx) {
+      return false;
+    }
+
+    const qrAreaSize = moduleCount * cellSize;
+    const qrOffset = marginModules * cellSize;
+    const heartCenterX = qrOffset + qrAreaSize / 2;
+    const heartCenterY = qrOffset + qrAreaSize / 2 + qrAreaSize * 0.03;
+    const heartSize = qrAreaSize * 0.95;
+
+    ctx.clearRect(0, 0, canvasSize, canvasSize);
+    ctx.fillStyle = "#fff9fc";
+    ctx.fillRect(0, 0, canvasSize, canvasSize);
+
+    ctx.save();
+    drawHeartPath(ctx, heartCenterX, heartCenterY, heartSize);
+    ctx.fillStyle = "rgba(255, 190, 214, 0.28)";
+    ctx.fill();
+    ctx.restore();
+
+    for (let row = 0; row < moduleCount; row += 1) {
+      for (let col = 0; col < moduleCount; col += 1) {
+        const index = row * moduleCount + col;
+        if (!modules[index]) {
+          continue;
+        }
+
+        const structural = isStructuralQrModule(row, col, moduleCount);
+        const inHeart = isHeartQrModule(row, col, moduleCount);
+        const scale = structural || inHeart ? 0.94 : 0.62;
+        const size = cellSize * scale;
+        const offset = (cellSize - size) / 2;
+        const x = qrOffset + col * cellSize + offset;
+        const y = qrOffset + row * cellSize + offset;
+
+        ctx.fillStyle = "#cf1f60";
+
+        if (structural || inHeart) {
+          drawRoundedRect(ctx, x, y, size, Math.max(1, size * 0.24));
+        } else {
+          ctx.beginPath();
+          ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    ctx.save();
+    drawHeartPath(ctx, heartCenterX, heartCenterY, heartSize);
+    ctx.lineWidth = Math.max(1, cellSize * 0.25);
+    ctx.strokeStyle = "rgba(205, 36, 95, 0.26)";
+    ctx.stroke();
+    ctx.restore();
+
+    return true;
+  }
+
   function buildFallbackQrImageUrl(url) {
     const encoded = encodeURIComponent(url);
-    return `https://api.qrserver.com/v1/create-qr-code/?size=440x440&ecc=L&format=png&data=${encoded}`;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&ecc=M&format=png&data=${encoded}`;
   }
 
   function showFallbackQr(url) {
@@ -998,13 +1122,21 @@
       return;
     }
 
+    if (renderHeartStyleQr(url)) {
+      usingQrFallbackImage = false;
+      lastQrFallbackUrl = "";
+      setQrDisplayMode(false);
+      showStatus("Heart style QR ready. Send this image.");
+      return;
+    }
+
     window.QRCode.toCanvas(
       qrCanvas,
       url,
       {
-        width: 220,
+        width: 320,
         margin: 2,
-        errorCorrectionLevel: "L",
+        errorCorrectionLevel: "M",
         color: {
           dark: "#c81f5e",
           light: "#fff9fc"
