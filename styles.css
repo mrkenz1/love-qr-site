@@ -192,6 +192,7 @@ h1 {
 }
 
 .memory-card {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: #fff;
@@ -220,6 +221,27 @@ h1 {
   padding: 0.62rem 0.72rem 0.78rem;
   font-weight: 700;
   color: var(--text-main);
+}
+
+.memory-edit-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #fff;
+  background: #b71d56;
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  display: none;
+  z-index: 2;
+}
+
+body.admin-mode .memory-edit-btn {
+  display: inline-flex;
 }
 
 .playlist-wrap {
@@ -299,6 +321,18 @@ h1 {
   color: #8f1d4f;
 }
 
+body.admin-mode .admin-editable {
+  outline: 1px dashed #d33b73;
+  outline-offset: 2px;
+  border-radius: 8px;
+  cursor: text;
+  background: #fffdfd;
+}
+
+body.admin-mode .admin-editable:focus {
+  outline: 2px solid #b71d56;
+}
+
 .share-form {
   margin-top: 1rem;
   display: grid;
@@ -363,6 +397,13 @@ textarea:focus {
   font-size: 0.93rem;
   color: var(--accent-strong);
   font-weight: 600;
+}
+
+body.admin-mode .section-note::after {
+  content: "  (Admin editable)";
+  font-size: 0.78rem;
+  color: #b71d56;
+  font-weight: 700;
 }
 
 .page-footer {

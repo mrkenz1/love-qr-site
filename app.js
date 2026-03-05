@@ -1,6 +1,7 @@
 ﻿(() => {
   const openLetterBtn = document.getElementById("openLetterBtn");
   const letterSection = document.getElementById("letter");
+  const heroSubtext = document.getElementById("heroSubtext");
 
   const recipientHeading = document.getElementById("recipientHeading");
   const recipientInline = document.getElementById("recipientInline");
@@ -37,19 +38,95 @@
   let progressTimer = null;
   let isAdminMode = false;
 
+  const DEFAULT_PROFILE = {
+    to: "My Love",
+    from: "Your Forever",
+    note: ""
+  };
+
   function safeText(value, fallback) {
     const v = (value || "").trim();
     return v.length ? v : fallback;
   }
 
+  function getLetterBlocks() {
+    return Array.from(document.querySelectorAll("[data-edit-letter]"));
+  }
+
+  function getSongItems() {
+    return Array.from(document.querySelectorAll(".song-item"));
+  }
+
+  function getMemoryCards() {
+    return Array.from(document.querySelectorAll(".memory-card"));
+  }
+
+  function readDefaultContent() {
+    return {
+      heroSubtext: safeText(heroSubtext?.textContent, "Every love story is beautiful, but ours is my favorite."),
+      letters: getLetterBlocks().map((p) => safeText(p.textContent, "")),
+      songs: getSongItems().map((item) => safeText(item.textContent, "")),
+      memories: getMemoryCards().map((card) => ({
+        title: safeText(card.getAttribute("data-title"), "Memory"),
+        caption: safeText(card.getAttribute("data-caption"), ""),
+        image: safeText(card.getAttribute("data-image"), memoryFallbackImage)
+      }))
+    };
+  }
+
+  const defaultContent = readDefaultContent();
+
+  function utf8ToBase64Url(value) {
+    const bytes = new TextEncoder().encode(value);
+    let binary = "";
+    bytes.forEach((b) => {
+      binary += String.fromCharCode(b);
+    });
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  }
+
+  function base64UrlToUtf8(value) {
+    const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+    const binary = atob(base64 + padding);
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  }
+
+  function encodeCfg(config) {
+    try {
+      return utf8ToBase64Url(JSON.stringify(config));
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function decodeCfg(raw) {
+    if (!raw) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(base64UrlToUtf8(raw));
+      if (parsed && typeof parsed === "object") {
+        return parsed;
+      }
+      return null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
   function readParams() {
     const params = new URLSearchParams(window.location.search);
-    const to = safeText(params.get("to"), "My Love");
-    const from = safeText(params.get("from"), "Your Forever");
-    const note = safeText(params.get("note"), "");
-    const lock = params.get("lock") === "1";
-    const admin = params.get("admin") === "1";
-    return { to, from, note, lock, admin };
+    return {
+      to: safeText(params.get("to"), DEFAULT_PROFILE.to),
+      from: safeText(params.get("from"), DEFAULT_PROFILE.from),
+      note: safeText(params.get("note"), DEFAULT_PROFILE.note),
+      lock: params.get("lock") === "1",
+      admin: params.get("admin") === "1",
+      cfg: decodeCfg(params.get("cfg"))
+    };
   }
 
   function applyProfile(profile) {
@@ -65,26 +142,151 @@
       customNote.textContent = "";
     }
 
-    toInput.value = profile.to === "My Love" ? "" : profile.to;
-    fromInput.value = profile.from === "Your Forever" ? "" : profile.from;
+    toInput.value = profile.to === DEFAULT_PROFILE.to ? "" : profile.to;
+    fromInput.value = profile.from === DEFAULT_PROFILE.from ? "" : profile.from;
     noteInput.value = profile.note;
   }
 
-  function buildPersonalUrl(to, from, note, options = {}) {
-    const { lock = true, admin = false } = options;
-    const url = new URL(window.location.href);
-    url.search = "";
-    url.hash = "";
+  function ensureImageFallback(imgElement) {
+    if (!imgElement || imgElement.dataset.fallbackBound === "1") {
+      return;
+    }
 
-    if (to && to !== "My Love") {
-      url.searchParams.set("to", to);
+    imgElement.addEventListener("error", () => {
+      if (imgElement.src.endsWith("memory-fallback.svg")) {
+        return;
+      }
+      imgElement.src = memoryFallbackImage;
+    });
+
+    imgElement.dataset.fallbackBound = "1";
+  }
+
+  function applyCfg(cfg) {
+    if (!cfg || typeof cfg !== "object") {
+      return;
     }
-    if (from && from !== "Your Forever") {
-      url.searchParams.set("from", from);
+
+    if (typeof cfg.heroSubtext === "string" && heroSubtext) {
+      heroSubtext.textContent = safeText(cfg.heroSubtext, defaultContent.heroSubtext);
     }
-    if (note) {
-      url.searchParams.set("note", note);
+
+    if (Array.isArray(cfg.letters)) {
+      const letters = getLetterBlocks();
+      letters.forEach((block, index) => {
+        const next = cfg.letters[index];
+        if (typeof next === "string") {
+          block.textContent = safeText(next, defaultContent.letters[index] || "");
+        }
+      });
     }
+
+    if (Array.isArray(cfg.songs)) {
+      const songs = getSongItems();
+      songs.forEach((item, index) => {
+        const next = cfg.songs[index];
+        if (typeof next === "string") {
+          const songName = safeText(next, defaultContent.songs[index] || "Untitled Song");
+          item.textContent = songName;
+          item.setAttribute("data-song", songName);
+        }
+      });
+
+      const activeSong = document.querySelector(".song-item.active");
+      if (activeSong) {
+        nowPlaying.textContent = safeText(activeSong.getAttribute("data-song"), activeSong.textContent);
+      }
+    }
+
+    if (Array.isArray(cfg.memories)) {
+      const cards = getMemoryCards();
+      cards.forEach((card, index) => {
+        const next = cfg.memories[index];
+        if (!next || typeof next !== "object") {
+          return;
+        }
+
+        const title = safeText(next.title, card.getAttribute("data-title") || "Memory");
+        const caption = safeText(next.caption, card.getAttribute("data-caption") || "");
+        const image = safeText(next.image, card.getAttribute("data-image") || memoryFallbackImage);
+
+        card.setAttribute("data-title", title);
+        card.setAttribute("data-caption", caption);
+        card.setAttribute("data-image", image);
+
+        const captionNode = card.querySelector("span");
+        if (captionNode) {
+          captionNode.textContent = title;
+        }
+
+        const cardImage = card.querySelector("img");
+        if (cardImage) {
+          ensureImageFallback(cardImage);
+          cardImage.src = image;
+        }
+      });
+    }
+  }
+
+  function showStatus(message, isError = false) {
+    shareStatus.textContent = message;
+    shareStatus.style.color = isError ? "#9f103f" : "#c81f5e";
+  }
+
+  function compactCfg(cfg) {
+    const compact = {};
+
+    if (cfg.heroSubtext !== defaultContent.heroSubtext) {
+      compact.heroSubtext = cfg.heroSubtext;
+    }
+
+    if (JSON.stringify(cfg.letters) !== JSON.stringify(defaultContent.letters)) {
+      compact.letters = cfg.letters;
+    }
+
+    if (JSON.stringify(cfg.songs) !== JSON.stringify(defaultContent.songs)) {
+      compact.songs = cfg.songs;
+    }
+
+    if (JSON.stringify(cfg.memories) !== JSON.stringify(defaultContent.memories)) {
+      compact.memories = cfg.memories;
+    }
+
+    return compact;
+  }
+
+  function collectCfgFromDom() {
+    return {
+      heroSubtext: safeText(heroSubtext?.textContent, defaultContent.heroSubtext),
+      letters: getLetterBlocks().map((p, index) => safeText(p.textContent, defaultContent.letters[index] || "")),
+      songs: getSongItems().map((item, index) => safeText(item.textContent, defaultContent.songs[index] || "Untitled Song")),
+      memories: getMemoryCards().map((card, index) => ({
+        title: safeText(card.getAttribute("data-title"), defaultContent.memories[index]?.title || "Memory"),
+        caption: safeText(card.getAttribute("data-caption"), defaultContent.memories[index]?.caption || ""),
+        image: safeText(card.getAttribute("data-image"), defaultContent.memories[index]?.image || memoryFallbackImage)
+      }))
+    };
+  }
+
+  function buildUrl(profile, cfg, options = {}) {
+    const { lock = false, admin = false } = options;
+    const url = new URL(window.location.origin + window.location.pathname);
+
+    if (profile.to && profile.to !== DEFAULT_PROFILE.to) {
+      url.searchParams.set("to", profile.to);
+    }
+    if (profile.from && profile.from !== DEFAULT_PROFILE.from) {
+      url.searchParams.set("from", profile.from);
+    }
+    if (profile.note) {
+      url.searchParams.set("note", profile.note);
+    }
+
+    const cfgPayload = encodeCfg(cfg);
+    if (cfgPayload) {
+      url.searchParams.set("cfg", cfgPayload);
+    }
+
     if (lock) {
       url.searchParams.set("lock", "1");
     }
@@ -93,11 +295,6 @@
     }
 
     return url.toString();
-  }
-
-  function showStatus(message, isError = false) {
-    shareStatus.textContent = message;
-    shareStatus.style.color = isError ? "#9f103f" : "#c81f5e";
   }
 
   function renderQr(url) {
@@ -124,23 +321,35 @@
           showStatus("Could not generate QR. Try again.", true);
           return;
         }
-        showStatus("QR is ready. Send the image or link.");
+        showStatus("Locked QR updated. Send this to recipient.");
       }
     );
   }
 
-  function updateShareFromForm() {
-    const to = safeText(toInput.value, "My Love");
-    const from = safeText(fromInput.value, "Your Forever");
-    const note = safeText(noteInput.value, "");
+  function getCurrentProfileFromInputs() {
+    return {
+      to: safeText(toInput.value, DEFAULT_PROFILE.to),
+      from: safeText(fromInput.value, DEFAULT_PROFILE.from),
+      note: safeText(noteInput.value, DEFAULT_PROFILE.note)
+    };
+  }
 
-    const profile = { to, from, note };
+  function refreshAdminQr(pushHistory = true) {
+    if (!isAdminMode) {
+      return;
+    }
+
+    const profile = getCurrentProfileFromInputs();
     applyProfile(profile);
 
-    const lockedUrl = buildPersonalUrl(to, from, note, { lock: true, admin: false });
-    const previewUrl = buildPersonalUrl(to, from, note, { lock: false, admin: isAdminMode });
+    const cfg = compactCfg(collectCfgFromDom());
+    const lockedUrl = buildUrl(profile, cfg, { lock: true, admin: false });
+    const adminUrl = buildUrl(profile, cfg, { lock: false, admin: true });
+
     renderQr(lockedUrl);
-    window.history.replaceState(null, "", previewUrl);
+    if (pushHistory) {
+      window.history.replaceState(null, "", adminUrl);
+    }
   }
 
   async function copyLink() {
@@ -172,6 +381,7 @@
       showStatus("Generate a link first.", true);
       return;
     }
+
     const png = qrCanvas.toDataURL("image/png");
     const a = document.createElement("a");
     a.href = png;
@@ -206,48 +416,8 @@
     }
   }
 
-  function ensureImageFallback(imgElement) {
-    imgElement.addEventListener(
-      "error",
-      () => {
-        if (imgElement.src.endsWith("memory-fallback.svg")) {
-          return;
-        }
-        imgElement.src = memoryFallbackImage;
-      },
-      { once: true }
-    );
-  }
-
-  function setRecipientView(isLockedView, adminView) {
-    if (!isLockedView || adminView) {
-      return;
-    }
-    if (shareSection) {
-      shareSection.hidden = true;
-    }
-    if (shareNavLink) {
-      shareNavLink.hidden = true;
-    }
-  }
-
-  function openModal(image, title, caption) {
-    ensureImageFallback(modalImage);
-    modalImage.src = image;
-    modalTitle.textContent = title;
-    modalCaption.textContent = caption;
-    memoryModal.hidden = false;
-    document.body.style.overflow = "hidden";
-  }
-
-  function closeModal() {
-    memoryModal.hidden = true;
-    modalImage.src = "";
-    document.body.style.overflow = "";
-  }
-
   function setSong(element) {
-    const song = element.getAttribute("data-song") || "Timeless Love Song";
+    const song = safeText(element.getAttribute("data-song") || element.textContent, "Timeless Love Song");
     const artist = element.getAttribute("data-artist") || "Your Playlist";
 
     nowPlaying.textContent = song;
@@ -278,7 +448,23 @@
       tickProgress();
       return;
     }
+
     clearInterval(progressTimer);
+  }
+
+  function openModal(image, title, caption) {
+    ensureImageFallback(modalImage);
+    modalImage.src = image;
+    modalTitle.textContent = title;
+    modalCaption.textContent = caption;
+    memoryModal.hidden = false;
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeModal() {
+    memoryModal.hidden = true;
+    modalImage.src = "";
+    document.body.style.overflow = "";
   }
 
   function setupReveal() {
@@ -304,11 +490,122 @@
     revealables.forEach((el) => io.observe(el));
   }
 
+  function setToolsVisibility(visible) {
+    if (shareSection) {
+      shareSection.hidden = !visible;
+    }
+    if (shareNavLink) {
+      shareNavLink.hidden = !visible;
+    }
+  }
+
+  function makeEditable(node, onChange) {
+    node.contentEditable = "true";
+    node.spellcheck = false;
+    node.classList.add("admin-editable");
+    node.addEventListener("input", onChange);
+    node.addEventListener("blur", onChange);
+  }
+
+  function addMemoryEditButtons() {
+    getMemoryCards().forEach((card) => {
+      if (card.querySelector(".memory-edit-btn")) {
+        return;
+      }
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "memory-edit-btn";
+      btn.textContent = "Edit";
+
+      btn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const currentTitle = card.getAttribute("data-title") || "Memory";
+        const currentCaption = card.getAttribute("data-caption") || "";
+        const currentImage = card.getAttribute("data-image") || memoryFallbackImage;
+
+        const nextTitle = window.prompt("Memory title", currentTitle);
+        if (nextTitle === null) {
+          return;
+        }
+
+        const nextCaption = window.prompt("Memory caption", currentCaption);
+        if (nextCaption === null) {
+          return;
+        }
+
+        const nextImage = window.prompt("Image URL / path", currentImage);
+        if (nextImage === null) {
+          return;
+        }
+
+        const title = safeText(nextTitle, currentTitle);
+        const caption = safeText(nextCaption, currentCaption);
+        const image = safeText(nextImage, currentImage);
+
+        card.setAttribute("data-title", title);
+        card.setAttribute("data-caption", caption);
+        card.setAttribute("data-image", image);
+
+        const titleNode = card.querySelector("span");
+        if (titleNode) {
+          titleNode.textContent = title;
+        }
+
+        const cardImage = card.querySelector("img");
+        if (cardImage) {
+          ensureImageFallback(cardImage);
+          cardImage.src = image;
+        }
+
+        refreshAdminQr();
+      });
+
+      card.appendChild(btn);
+    });
+  }
+
+  function enableAdminMode() {
+    isAdminMode = true;
+    document.body.classList.add("admin-mode");
+    setToolsVisibility(true);
+
+    if (heroSubtext) {
+      makeEditable(heroSubtext, () => refreshAdminQr());
+    }
+
+    getLetterBlocks().forEach((block) => {
+      makeEditable(block, () => refreshAdminQr());
+    });
+
+    getSongItems().forEach((item) => {
+      makeEditable(item, () => {
+        const songName = safeText(item.textContent, "Untitled Song");
+        item.textContent = songName;
+        item.setAttribute("data-song", songName);
+        if (item.classList.contains("active")) {
+          nowPlaying.textContent = songName;
+        }
+        refreshAdminQr();
+      });
+    });
+
+    addMemoryEditButtons();
+
+    [toInput, fromInput, noteInput].forEach((input) => {
+      input.addEventListener("input", () => refreshAdminQr());
+    });
+
+    showStatus("Admin mode active. Every change updates locked QR.");
+  }
+
   openLetterBtn.addEventListener("click", () => {
     letterSection.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
-  document.querySelectorAll(".memory-card").forEach((card) => {
+  getMemoryCards().forEach((card) => {
     const cardImage = card.querySelector("img");
     if (cardImage) {
       ensureImageFallback(cardImage);
@@ -316,7 +613,7 @@
 
     card.addEventListener("click", () => {
       openModal(
-        card.getAttribute("data-image") || "",
+        card.getAttribute("data-image") || memoryFallbackImage,
         card.getAttribute("data-title") || "Memory",
         card.getAttribute("data-caption") || ""
       );
@@ -354,7 +651,7 @@
 
   shareForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    updateShareFromForm();
+    refreshAdminQr();
   });
 
   copyBtn.addEventListener("click", copyLink);
@@ -362,13 +659,19 @@
   nativeShareBtn.addEventListener("click", nativeShare);
 
   const initialProfile = readParams();
-  isAdminMode = initialProfile.admin;
-
   applyProfile(initialProfile);
-  setRecipientView(initialProfile.lock, initialProfile.admin);
+  applyCfg(initialProfile.cfg);
 
-  if (!initialProfile.lock || initialProfile.admin) {
-    renderQr(buildPersonalUrl(initialProfile.to, initialProfile.from, initialProfile.note, { lock: true, admin: false }));
+  if (initialProfile.admin) {
+    enableAdminMode();
+    refreshAdminQr(false);
+
+    const profile = getCurrentProfileFromInputs();
+    const cfg = compactCfg(collectCfgFromDom());
+    const adminUrl = buildUrl(profile, cfg, { lock: false, admin: true });
+    window.history.replaceState(null, "", adminUrl);
+  } else {
+    setToolsVisibility(false);
   }
 
   setupReveal();
