@@ -30,6 +30,8 @@
   const downloadQrBtn = document.getElementById("downloadQrBtn");
   const nativeShareBtn = document.getElementById("nativeShareBtn");
   const shareStatus = document.getElementById("shareStatus");
+  const shareSection = document.getElementById("share");
+  const shareNavLink = document.getElementById("shareNavLink");
 
   let isPlaying = false;
   let progressTimer = null;
@@ -44,7 +46,8 @@
     const to = safeText(params.get("to"), "My Love");
     const from = safeText(params.get("from"), "Your Forever");
     const note = safeText(params.get("note"), "");
-    return { to, from, note };
+    const lock = params.get("lock") === "1";
+    return { to, from, note, lock };
   }
 
   function applyProfile(profile) {
@@ -65,9 +68,10 @@
     noteInput.value = profile.note;
   }
 
-  function buildPersonalUrl(to, from, note) {
+  function buildPersonalUrl(to, from, note, lock = true) {
     const url = new URL(window.location.href);
     url.search = "";
+    url.hash = "";
 
     if (to && to !== "My Love") {
       url.searchParams.set("to", to);
@@ -77,6 +81,9 @@
     }
     if (note) {
       url.searchParams.set("note", note);
+    }
+    if (lock) {
+      url.searchParams.set("lock", "1");
     }
 
     return url.toString();
@@ -124,10 +131,10 @@
     const profile = { to, from, note };
     applyProfile(profile);
 
-    const url = buildPersonalUrl(to, from, note);
-    renderQr(url);
-
-    window.history.replaceState(null, "", url);
+    const lockedUrl = buildPersonalUrl(to, from, note, true);
+    const previewUrl = buildPersonalUrl(to, from, note, false);
+    renderQr(lockedUrl);
+    window.history.replaceState(null, "", previewUrl);
   }
 
   async function copyLink() {
@@ -338,6 +345,20 @@
 
   const initialProfile = readParams();
   applyProfile(initialProfile);
-  renderQr(buildPersonalUrl(initialProfile.to, initialProfile.from, initialProfile.note));
+  setRecipientView(initialProfile.lock);
+  if (!initialProfile.lock) {
+    renderQr(buildPersonalUrl(initialProfile.to, initialProfile.from, initialProfile.note, true));
+  }
   setupReveal();
 })();
+  function setRecipientView(isLockedView) {
+    if (!isLockedView) {
+      return;
+    }
+    if (shareSection) {
+      shareSection.hidden = true;
+    }
+    if (shareNavLink) {
+      shareNavLink.hidden = true;
+    }
+  }
