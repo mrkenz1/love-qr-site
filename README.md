@@ -46,3 +46,13 @@ Then open `http://localhost:8080`.
    - downloaded QR image (`love-qr.png`).
 
 When the other person scans the QR, the same personalized page opens.
+
+## Add your photos and music
+1. Put photos in `assets/photos` (create the folder if needed).
+2. Put songs in `assets/music` (for example `song-1.mp3`, `song-2.mp3`).
+3. Open admin mode: `https://mrkenz1.github.io/love-qr-site/?admin=1`
+4. In Memories, click `Edit` to change image paths.
+5. In Playlist:
+   - edit song names inline
+   - click the `Audio` button on each song and set path like `./assets/music/song-1.mp3`
+6. The locked QR auto-refreshes after changes.

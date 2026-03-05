@@ -20,6 +20,8 @@
   const nowArtist = document.getElementById("nowArtist");
   const playPauseBtn = document.getElementById("playPauseBtn");
   const progressBar = document.getElementById("progressBar");
+  const playerStatus = document.getElementById("playerStatus");
+  const audioPlayer = document.getElementById("audioPlayer");
 
   const shareForm = document.getElementById("shareForm");
   const toInput = document.getElementById("toInput");
@@ -35,7 +37,6 @@
   const shareNavLink = document.getElementById("shareNavLink");
 
   let isPlaying = false;
-  let progressTimer = null;
   let isAdminMode = false;
 
   const DEFAULT_PROFILE = {
@@ -61,11 +62,30 @@
     return Array.from(document.querySelectorAll(".memory-card"));
   }
 
+  function getSongNameNode(item) {
+    return item.querySelector(".song-name");
+  }
+
+  function songEntryFromItem(item, fallback = {}) {
+    const defaultName = fallback.name || "Untitled Song";
+    const defaultArtist = fallback.artist || "Your Playlist";
+    const defaultSrc = fallback.src || "";
+
+    const nameNode = getSongNameNode(item);
+    const visualName = nameNode ? nameNode.textContent : item.textContent;
+
+    return {
+      name: safeText(item.getAttribute("data-song") || visualName, defaultName),
+      artist: safeText(item.getAttribute("data-artist"), defaultArtist),
+      src: safeText(item.getAttribute("data-src"), defaultSrc)
+    };
+  }
+
   function readDefaultContent() {
     return {
       heroSubtext: safeText(heroSubtext?.textContent, "Every love story is beautiful, but ours is my favorite."),
       letters: getLetterBlocks().map((p) => safeText(p.textContent, "")),
-      songs: getSongItems().map((item) => safeText(item.textContent, "")),
+      songs: getSongItems().map((item) => songEntryFromItem(item)),
       memories: getMemoryCards().map((card) => ({
         title: safeText(card.getAttribute("data-title"), "Memory"),
         caption: safeText(card.getAttribute("data-caption"), ""),
@@ -162,6 +182,123 @@
     imgElement.dataset.fallbackBound = "1";
   }
 
+  function showStatus(message, isError = false) {
+    shareStatus.textContent = message;
+    shareStatus.style.color = isError ? "#9f103f" : "#c81f5e";
+  }
+
+  function showPlayerStatus(message, isError = false) {
+    if (!playerStatus) {
+      return;
+    }
+    playerStatus.textContent = message;
+    playerStatus.style.color = isError ? "#9f103f" : "#8f1d4f";
+  }
+
+  function normalizeSongConfig(raw, fallback = {}) {
+    if (typeof raw === "string") {
+      return {
+        name: safeText(raw, fallback.name || "Untitled Song"),
+        artist: safeText(fallback.artist, "Your Playlist"),
+        src: safeText(fallback.src, "")
+      };
+    }
+
+    if (raw && typeof raw === "object") {
+      return {
+        name: safeText(raw.name, fallback.name || "Untitled Song"),
+        artist: safeText(raw.artist, fallback.artist || "Your Playlist"),
+        src: safeText(raw.src, fallback.src || "")
+      };
+    }
+
+    return {
+      name: safeText(fallback.name, "Untitled Song"),
+      artist: safeText(fallback.artist, "Your Playlist"),
+      src: safeText(fallback.src, "")
+    };
+  }
+
+  function refreshSongVisual(item) {
+    const src = safeText(item.getAttribute("data-src"), "");
+    if (src) {
+      item.removeAttribute("data-empty-src");
+    } else {
+      item.setAttribute("data-empty-src", "1");
+    }
+  }
+
+  function ensureSongMarkup(item) {
+    let nameNode = getSongNameNode(item);
+    if (!nameNode) {
+      const initialName = safeText(item.getAttribute("data-song") || item.textContent, "Untitled Song");
+      item.textContent = "";
+      nameNode = document.createElement("span");
+      nameNode.className = "song-name";
+      nameNode.textContent = initialName;
+      item.appendChild(nameNode);
+    }
+
+    let srcBtn = item.querySelector(".song-src-btn");
+    if (!srcBtn) {
+      srcBtn = document.createElement("button");
+      srcBtn.type = "button";
+      srcBtn.className = "song-src-btn";
+      srcBtn.textContent = "Audio";
+      srcBtn.setAttribute("aria-label", "Edit audio source");
+      item.appendChild(srcBtn);
+    }
+
+    if (item.dataset.songBound !== "1") {
+      srcBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (!isAdminMode) {
+          return;
+        }
+
+        const current = safeText(item.getAttribute("data-src"), "");
+        const next = window.prompt("Audio URL or path (example: ./assets/music/song-1.mp3)", current);
+        if (next === null) {
+          return;
+        }
+
+        item.setAttribute("data-src", safeText(next, ""));
+        refreshSongVisual(item);
+
+        if (item.classList.contains("active")) {
+          setSong(item, { autoplay: false, showMissing: false });
+        }
+
+        refreshAdminQr();
+      });
+
+      item.dataset.songBound = "1";
+    }
+
+    refreshSongVisual(item);
+  }
+
+  function setSongEntryOnItem(item, entry) {
+    const normalized = normalizeSongConfig(entry);
+    item.setAttribute("data-song", normalized.name);
+    item.setAttribute("data-artist", normalized.artist);
+    item.setAttribute("data-src", normalized.src);
+
+    ensureSongMarkup(item);
+    const nameNode = getSongNameNode(item);
+    if (nameNode) {
+      nameNode.textContent = normalized.name;
+    }
+
+    refreshSongVisual(item);
+  }
+
+  function getActiveSongItem() {
+    return document.querySelector(".song-item.active");
+  }
+
   function applyCfg(cfg) {
     if (!cfg || typeof cfg !== "object") {
       return;
@@ -184,18 +321,10 @@
     if (Array.isArray(cfg.songs)) {
       const songs = getSongItems();
       songs.forEach((item, index) => {
-        const next = cfg.songs[index];
-        if (typeof next === "string") {
-          const songName = safeText(next, defaultContent.songs[index] || "Untitled Song");
-          item.textContent = songName;
-          item.setAttribute("data-song", songName);
-        }
+        const fallback = defaultContent.songs[index] || songEntryFromItem(item);
+        const next = normalizeSongConfig(cfg.songs[index], fallback);
+        setSongEntryOnItem(item, next);
       });
-
-      const activeSong = document.querySelector(".song-item.active");
-      if (activeSong) {
-        nowPlaying.textContent = safeText(activeSong.getAttribute("data-song"), activeSong.textContent);
-      }
     }
 
     if (Array.isArray(cfg.memories)) {
@@ -228,11 +357,6 @@
     }
   }
 
-  function showStatus(message, isError = false) {
-    shareStatus.textContent = message;
-    shareStatus.style.color = isError ? "#9f103f" : "#c81f5e";
-  }
-
   function compactCfg(cfg) {
     const compact = {};
 
@@ -259,7 +383,7 @@
     return {
       heroSubtext: safeText(heroSubtext?.textContent, defaultContent.heroSubtext),
       letters: getLetterBlocks().map((p, index) => safeText(p.textContent, defaultContent.letters[index] || "")),
-      songs: getSongItems().map((item, index) => safeText(item.textContent, defaultContent.songs[index] || "Untitled Song")),
+      songs: getSongItems().map((item, index) => songEntryFromItem(item, defaultContent.songs[index])),
       memories: getMemoryCards().map((card, index) => ({
         title: safeText(card.getAttribute("data-title"), defaultContent.memories[index]?.title || "Memory"),
         caption: safeText(card.getAttribute("data-caption"), defaultContent.memories[index]?.caption || ""),
@@ -416,40 +540,112 @@
     }
   }
 
-  function setSong(element) {
-    const song = safeText(element.getAttribute("data-song") || element.textContent, "Timeless Love Song");
-    const artist = element.getAttribute("data-artist") || "Your Playlist";
-
-    nowPlaying.textContent = song;
-    nowArtist.textContent = artist;
-
-    document.querySelectorAll(".song-item").forEach((item) => item.classList.remove("active"));
-    element.classList.add("active");
-
-    if (!isPlaying) {
-      togglePlay();
-    }
-  }
-
-  function tickProgress() {
-    clearInterval(progressTimer);
-    progressTimer = setInterval(() => {
-      const current = Number.parseFloat(progressBar.style.width || "8") || 8;
-      const next = current >= 100 ? 8 : current + 2.8;
-      progressBar.style.width = `${next}%`;
-    }, 260);
-  }
-
-  function togglePlay() {
-    isPlaying = !isPlaying;
+  function setPlayingState(next) {
+    isPlaying = next;
     playPauseBtn.textContent = isPlaying ? "Pause" : "Play";
+  }
 
-    if (isPlaying) {
-      tickProgress();
+  function updateProgressFromAudio() {
+    if (!audioPlayer || !Number.isFinite(audioPlayer.duration) || audioPlayer.duration <= 0) {
+      progressBar.style.width = "0%";
       return;
     }
 
-    clearInterval(progressTimer);
+    const pct = Math.max(0, Math.min(100, (audioPlayer.currentTime / audioPlayer.duration) * 100));
+    progressBar.style.width = `${pct}%`;
+  }
+
+  function applySongToHeader(item) {
+    const entry = songEntryFromItem(item);
+    nowPlaying.textContent = entry.name;
+    nowArtist.textContent = entry.artist;
+  }
+
+  function loadAudioForSong(item) {
+    const entry = songEntryFromItem(item);
+    if (!entry.src) {
+      if (audioPlayer) {
+        audioPlayer.pause();
+        audioPlayer.removeAttribute("src");
+        audioPlayer.dataset.songSrc = "";
+        audioPlayer.load();
+      }
+      progressBar.style.width = "0%";
+      return false;
+    }
+
+    if (audioPlayer && audioPlayer.dataset.songSrc !== entry.src) {
+      audioPlayer.pause();
+      audioPlayer.src = entry.src;
+      audioPlayer.dataset.songSrc = entry.src;
+      audioPlayer.load();
+      progressBar.style.width = "0%";
+    }
+
+    return true;
+  }
+
+  function setSong(item, options = {}) {
+    const { autoplay = true, showMissing = true } = options;
+
+    document.querySelectorAll(".song-item").forEach((node) => node.classList.remove("active"));
+    item.classList.add("active");
+    applySongToHeader(item);
+
+    const hasSource = loadAudioForSong(item);
+    if (!hasSource) {
+      setPlayingState(false);
+      if (showMissing) {
+        showPlayerStatus("No audio source. Admin mode: set Audio path.", true);
+      }
+      return;
+    }
+
+    if (!audioPlayer) {
+      return;
+    }
+
+    if (!autoplay) {
+      setPlayingState(!audioPlayer.paused);
+      showPlayerStatus("Audio ready.");
+      return;
+    }
+
+    audioPlayer.play()
+      .then(() => {
+        setPlayingState(true);
+        showPlayerStatus("Playing.");
+      })
+      .catch(() => {
+        setPlayingState(false);
+        showPlayerStatus("Could not play this audio. Check file path/format.", true);
+      });
+  }
+
+  function togglePlay() {
+    const active = getActiveSongItem() || getSongItems()[0];
+    if (!active) {
+      return;
+    }
+
+    if (!audioPlayer) {
+      return;
+    }
+
+    const entry = songEntryFromItem(active);
+    if (!entry.src) {
+      showPlayerStatus("No audio source. Admin mode: set Audio path.", true);
+      return;
+    }
+
+    if (!audioPlayer.paused && audioPlayer.dataset.songSrc === entry.src) {
+      audioPlayer.pause();
+      setPlayingState(false);
+      showPlayerStatus("Paused.");
+      return;
+    }
+
+    setSong(active, { autoplay: true, showMissing: true });
   }
 
   function openModal(image, title, caption) {
@@ -500,6 +696,9 @@
   }
 
   function makeEditable(node, onChange) {
+    if (!node) {
+      return;
+    }
     node.contentEditable = "true";
     node.spellcheck = false;
     node.classList.add("admin-editable");
@@ -567,27 +766,47 @@
     });
   }
 
+  function setupSongUi() {
+    getSongItems().forEach((item, index) => {
+      const fallback = defaultContent.songs[index] || songEntryFromItem(item);
+      setSongEntryOnItem(item, songEntryFromItem(item, fallback));
+    });
+
+    const active = getActiveSongItem() || getSongItems()[0];
+    if (active && !getActiveSongItem()) {
+      active.classList.add("active");
+    }
+
+    const selected = getActiveSongItem() || getSongItems()[0];
+    if (selected) {
+      setSong(selected, { autoplay: false, showMissing: false });
+    }
+  }
+
   function enableAdminMode() {
     isAdminMode = true;
     document.body.classList.add("admin-mode");
     setToolsVisibility(true);
 
-    if (heroSubtext) {
-      makeEditable(heroSubtext, () => refreshAdminQr());
-    }
+    makeEditable(heroSubtext, () => refreshAdminQr());
 
     getLetterBlocks().forEach((block) => {
       makeEditable(block, () => refreshAdminQr());
     });
 
     getSongItems().forEach((item) => {
-      makeEditable(item, () => {
-        const songName = safeText(item.textContent, "Untitled Song");
-        item.textContent = songName;
+      const nameNode = getSongNameNode(item);
+      makeEditable(nameNode, () => {
+        const songName = safeText(nameNode?.textContent, "Untitled Song");
         item.setAttribute("data-song", songName);
+        if (nameNode) {
+          nameNode.textContent = songName;
+        }
+
         if (item.classList.contains("active")) {
           nowPlaying.textContent = songName;
         }
+
         refreshAdminQr();
       });
     });
@@ -599,6 +818,7 @@
     });
 
     showStatus("Admin mode active. Every change updates locked QR.");
+    showPlayerStatus("Admin mode: Edit song name inline, click Audio to set file path.");
   }
 
   openLetterBtn.addEventListener("click", () => {
@@ -640,14 +860,38 @@
       if (!(target instanceof HTMLElement)) {
         return;
       }
+
+      if (target.closest(".song-src-btn")) {
+        return;
+      }
+
       const item = target.closest(".song-item");
       if (item) {
-        setSong(item);
+        setSong(item, { autoplay: true, showMissing: true });
       }
     });
   }
 
   playPauseBtn.addEventListener("click", togglePlay);
+
+  if (audioPlayer) {
+    audioPlayer.addEventListener("timeupdate", updateProgressFromAudio);
+    audioPlayer.addEventListener("play", () => {
+      setPlayingState(true);
+    });
+    audioPlayer.addEventListener("pause", () => {
+      setPlayingState(false);
+    });
+    audioPlayer.addEventListener("ended", () => {
+      setPlayingState(false);
+      progressBar.style.width = "0%";
+      showPlayerStatus("Playback ended.");
+    });
+    audioPlayer.addEventListener("error", () => {
+      setPlayingState(false);
+      showPlayerStatus("Audio failed to load. Check file path.", true);
+    });
+  }
 
   shareForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -661,6 +905,7 @@
   const initialProfile = readParams();
   applyProfile(initialProfile);
   applyCfg(initialProfile.cfg);
+  setupSongUi();
 
   if (initialProfile.admin) {
     enableAdminMode();
@@ -672,6 +917,7 @@
     window.history.replaceState(null, "", adminUrl);
   } else {
     setToolsVisibility(false);
+    showPlayerStatus("Select a song and press Play.");
   }
 
   setupReveal();

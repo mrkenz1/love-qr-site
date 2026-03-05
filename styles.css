@@ -273,6 +273,18 @@ body.admin-mode .memory-edit-btn {
   color: var(--text-soft);
 }
 
+.player-status {
+  margin: 0.45rem 0 0;
+  min-height: 1.25rem;
+  color: #8f1d4f;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+#audioPlayer {
+  display: none;
+}
+
 .player-controls {
   margin-top: 0.8rem;
   display: grid;
@@ -304,11 +316,40 @@ body.admin-mode .memory-edit-btn {
 }
 
 .song-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.72rem;
   border-radius: 10px;
   cursor: pointer;
   font-weight: 600;
   color: #5b3443;
+}
+
+.song-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.song-src-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  background: #b71d56;
+  cursor: pointer;
+  display: none;
+}
+
+body.admin-mode .song-src-btn {
+  display: inline-flex;
+}
+
+.song-item[data-empty-src="1"] {
+  border: 1px dashed #d14e80;
 }
 
 .song-item + .song-item {

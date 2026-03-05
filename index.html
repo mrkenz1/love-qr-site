@@ -94,6 +94,8 @@
         <div class="player-box">
           <p class="player-title" id="nowPlaying">Timeless Love Song</p>
           <p class="player-artist" id="nowArtist">Your Playlist</p>
+          <p id="playerStatus" class="player-status">Select a song and press Play.</p>
+          <audio id="audioPlayer" preload="metadata"></audio>
           <div class="player-controls">
             <button id="playPauseBtn" class="btn btn-primary" type="button">Play</button>
             <div class="progress-track">
@@ -103,10 +105,10 @@
         </div>
 
         <ul class="song-list" id="songList">
-          <li class="song-item active" data-song="Timeless Love Song" data-artist="Your Playlist">Timeless Love Song</li>
-          <li class="song-item" data-song="You and Me" data-artist="Your Playlist">You and Me</li>
-          <li class="song-item" data-song="Always in My Heart" data-artist="Your Playlist">Always in My Heart</li>
-          <li class="song-item" data-song="Forever Starts Tonight" data-artist="Your Playlist">Forever Starts Tonight</li>
+          <li class="song-item active" data-song="Timeless Love Song" data-artist="Your Playlist" data-src="./assets/music/song-1.mp3">Timeless Love Song</li>
+          <li class="song-item" data-song="You and Me" data-artist="Your Playlist" data-src="./assets/music/song-2.mp3">You and Me</li>
+          <li class="song-item" data-song="Always in My Heart" data-artist="Your Playlist" data-src="./assets/music/song-3.mp3">Always in My Heart</li>
+          <li class="song-item" data-song="Forever Starts Tonight" data-artist="Your Playlist" data-src="./assets/music/song-4.mp3">Forever Starts Tonight</li>
         </ul>
       </div>
     </section>
