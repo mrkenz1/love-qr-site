@@ -58,3 +58,4 @@ When the other person scans the QR, the same personalized page opens.
    - when one song ends, next song auto-plays
 5. The locked QR auto-refreshes after changes.
 6. If QR fails, shorten long text/note or very long SoundCloud URLs.
+7. If the QR JS library is blocked, the app auto-switches to image fallback mode.

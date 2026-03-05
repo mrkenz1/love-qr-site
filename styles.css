@@ -450,6 +450,14 @@ textarea:focus {
   height: auto;
 }
 
+#qrFallbackImage {
+  border: 1px solid #f7d5e1;
+  border-radius: 12px;
+  background: #fff;
+  width: min(220px, 100%);
+  height: auto;
+}
+
 #shareUrl {
   max-width: 100%;
 }

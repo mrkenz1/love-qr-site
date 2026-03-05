@@ -27,6 +27,7 @@
   const noteInput = document.getElementById("noteInput");
   const shareUrl = document.getElementById("shareUrl");
   const qrCanvas = document.getElementById("qrCanvas");
+  const qrFallbackImage = document.getElementById("qrFallbackImage");
   const copyBtn = document.getElementById("copyBtn");
   const downloadQrBtn = document.getElementById("downloadQrBtn");
   const nativeShareBtn = document.getElementById("nativeShareBtn");
@@ -37,6 +38,8 @@
   let isAdminMode = false;
   let soundcloudWidget = null;
   let soundcloudWidgetReady = false;
+  let usingQrFallbackImage = false;
+  let lastQrFallbackUrl = "";
 
   const DEFAULT_PROFILE = {
     to: "My Love",
@@ -687,6 +690,32 @@
     return url.toString();
   }
 
+  function setQrDisplayMode(useFallback) {
+    if (qrCanvas) {
+      qrCanvas.hidden = !!useFallback;
+    }
+    if (qrFallbackImage) {
+      qrFallbackImage.hidden = !useFallback;
+    }
+  }
+
+  function buildFallbackQrImageUrl(url) {
+    const encoded = encodeURIComponent(url);
+    return `https://api.qrserver.com/v1/create-qr-code/?size=440x440&ecc=L&format=png&data=${encoded}`;
+  }
+
+  function showFallbackQr(url) {
+    if (!qrFallbackImage) {
+      return false;
+    }
+
+    lastQrFallbackUrl = buildFallbackQrImageUrl(url);
+    qrFallbackImage.src = lastQrFallbackUrl;
+    usingQrFallbackImage = true;
+    setQrDisplayMode(true);
+    return true;
+  }
+
   function renderQr(url) {
     if (!shareUrl || !qrCanvas) {
       return;
@@ -695,7 +724,11 @@
     shareUrl.value = url;
 
     if (!window.QRCode || !window.QRCode.toCanvas) {
-      showStatus("QR library failed to load. Refresh the page and try again.", true);
+      if (showFallbackQr(url)) {
+        showStatus("QR fallback mode active. QR ready.");
+      } else {
+        showStatus("QR library failed to load. Refresh the page and try again.", true);
+      }
       return;
     }
 
@@ -713,13 +746,20 @@
       },
       (error) => {
         if (error) {
-          if (url.length > 2600) {
-            showStatus("QR link mash urt bn. Text/Note/song link-ee bogino bolgoj daraad oroldooroi.", true);
+          if (showFallbackQr(url)) {
+            showStatus("QR fallback mode active. QR ready.");
           } else {
-            showStatus("Could not generate QR. Refresh hiigeed dahin oroldooroi.", true);
+            if (url.length > 2600) {
+              showStatus("QR link mash urt bn. Text/Note/song link-ee bogino bolgoj daraad oroldooroi.", true);
+            } else {
+              showStatus("Could not generate QR. Refresh hiigeed dahin oroldooroi.", true);
+            }
           }
           return;
         }
+        usingQrFallbackImage = false;
+        lastQrFallbackUrl = "";
+        setQrDisplayMode(false);
         showStatus("Locked QR updated. Send this to recipient.");
       }
     );
@@ -776,12 +816,23 @@
   }
 
   function downloadQr() {
-    if (!shareUrl?.value || !qrCanvas) {
+    if (!shareUrl?.value) {
       showStatus("Generate a link first.", true);
       return;
     }
 
-    const png = qrCanvas.toDataURL("image/png");
+    let png = "";
+    if (usingQrFallbackImage && lastQrFallbackUrl) {
+      png = lastQrFallbackUrl;
+    } else if (qrCanvas) {
+      png = qrCanvas.toDataURL("image/png");
+    }
+
+    if (!png) {
+      showStatus("QR not ready yet. Try again.", true);
+      return;
+    }
+
     const a = document.createElement("a");
     a.href = png;
     a.download = "love-qr.png";
