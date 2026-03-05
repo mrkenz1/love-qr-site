@@ -57,3 +57,4 @@ When the other person scans the QR, the same personalized page opens.
    - click song names to switch the embedded player instantly
    - when one song ends, next song auto-plays
 5. The locked QR auto-refreshes after changes.
+6. If QR fails, shorten long text/note or very long SoundCloud URLs.

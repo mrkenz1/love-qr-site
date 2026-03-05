@@ -113,9 +113,103 @@
     return new TextDecoder().decode(bytes);
   }
 
+  function packSong(song) {
+    return [
+      safeText(song?.name, ""),
+      safeText(song?.artist, ""),
+      safeText(song?.scUrl ?? song?.src, "")
+    ];
+  }
+
+  function packMemory(memory) {
+    return [
+      safeText(memory?.title, ""),
+      safeText(memory?.caption, ""),
+      safeText(memory?.image, "")
+    ];
+  }
+
+  function serializeCfg(config) {
+    const packed = {};
+
+    if (typeof config?.heroSubtext === "string") {
+      packed.h = config.heroSubtext;
+    }
+
+    if (Array.isArray(config?.letters)) {
+      packed.l = config.letters.map((x) => safeText(x, ""));
+    }
+
+    if (Array.isArray(config?.songs)) {
+      packed.s = config.songs.map((song) => packSong(song));
+    }
+
+    if (Number.isInteger(config?.activeSongIndex)) {
+      packed.i = config.activeSongIndex;
+    }
+
+    if (Array.isArray(config?.memories)) {
+      packed.m = config.memories.map((memory) => packMemory(memory));
+    }
+
+    return packed;
+  }
+
+  function deserializeCfg(raw) {
+    if (!raw || typeof raw !== "object") {
+      return null;
+    }
+
+    const result = {};
+
+    if (typeof raw.h === "string") {
+      result.heroSubtext = raw.h;
+    } else if (typeof raw.heroSubtext === "string") {
+      result.heroSubtext = raw.heroSubtext;
+    }
+
+    if (Array.isArray(raw.l)) {
+      result.letters = raw.l.map((x) => safeText(x, ""));
+    } else if (Array.isArray(raw.letters)) {
+      result.letters = raw.letters.map((x) => safeText(x, ""));
+    }
+
+    if (Array.isArray(raw.s)) {
+      result.songs = raw.s.map((song) => normalizeSong({
+        name: Array.isArray(song) ? song[0] : song?.name,
+        artist: Array.isArray(song) ? song[1] : song?.artist,
+        scUrl: Array.isArray(song) ? song[2] : (song?.scUrl ?? song?.src)
+      }));
+    } else if (Array.isArray(raw.songs)) {
+      result.songs = raw.songs.map((song) => normalizeSong(song));
+    }
+
+    if (Number.isInteger(raw.i)) {
+      result.activeSongIndex = raw.i;
+    } else if (Number.isInteger(raw.activeSongIndex)) {
+      result.activeSongIndex = raw.activeSongIndex;
+    }
+
+    if (Array.isArray(raw.m)) {
+      result.memories = raw.m.map((memory) => ({
+        title: safeText(Array.isArray(memory) ? memory[0] : memory?.title, "Memory"),
+        caption: safeText(Array.isArray(memory) ? memory[1] : memory?.caption, ""),
+        image: safeText(Array.isArray(memory) ? memory[2] : memory?.image, memoryFallbackImage)
+      }));
+    } else if (Array.isArray(raw.memories)) {
+      result.memories = raw.memories.map((memory) => ({
+        title: safeText(memory?.title, "Memory"),
+        caption: safeText(memory?.caption, ""),
+        image: safeText(memory?.image, memoryFallbackImage)
+      }));
+    }
+
+    return result;
+  }
+
   function encodeCfg(config) {
     try {
-      return utf8ToBase64Url(JSON.stringify(config));
+      return utf8ToBase64Url(JSON.stringify(serializeCfg(config)));
     } catch (_error) {
       return "";
     }
@@ -128,10 +222,7 @@
 
     try {
       const parsed = JSON.parse(base64UrlToUtf8(raw));
-      if (parsed && typeof parsed === "object") {
-        return parsed;
-      }
-      return null;
+      return deserializeCfg(parsed);
     } catch (_error) {
       return null;
     }
@@ -614,6 +705,7 @@
       {
         width: 220,
         margin: 2,
+        errorCorrectionLevel: "L",
         color: {
           dark: "#c81f5e",
           light: "#fff9fc"
@@ -621,7 +713,11 @@
       },
       (error) => {
         if (error) {
-          showStatus("Could not generate QR. Try again.", true);
+          if (url.length > 2600) {
+            showStatus("QR link mash urt bn. Text/Note/song link-ee bogino bolgoj daraad oroldooroi.", true);
+          } else {
+            showStatus("Could not generate QR. Refresh hiigeed dahin oroldooroi.", true);
+          }
           return;
         }
         showStatus("Locked QR updated. Send this to recipient.");
